@@ -4,6 +4,8 @@ import {
   Outlet, 
   DeliveryPartner, 
   Order, 
+  OrderItem,
+  OrderTimeline,
   Coupon, 
   RawMaterial, 
   SupportTicket, 
@@ -434,7 +436,7 @@ const dbSlice = createSlice({
       }
     },
     // Support Center
-    replyToTicket(state, action: PayloadAction<{ ticketId: string; text: string; sender: 'support' | 'system' }>) {
+    replyToTicket(state, action: PayloadAction<{ ticketId: string; text: string; sender: 'customer' | 'support' | 'system' }>) {
       const ticket = state.tickets.find(t => t.id === action.payload.ticketId);
       if (ticket) {
         ticket.messages.push({

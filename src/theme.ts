@@ -225,15 +225,6 @@ const themeOptions: ThemeOptions = {
         },
       },
     },
-    MuiDrawer: {
-      styleOverrides: {
-        paper: {
-          backgroundImage: 'none',
-          borderRight: '1px solid #E8E4DF',
-          background: '#FDFCFA',
-        },
-      },
-    },
   },
 };
 

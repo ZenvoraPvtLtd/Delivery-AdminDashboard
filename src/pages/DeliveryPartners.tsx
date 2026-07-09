@@ -11,7 +11,7 @@ import {
   Bike, ShieldCheck, ShieldAlert, Plus, Compass, 
   Calendar, Phone, MapPin, UserPlus2, UserCheck
 } from 'lucide-react';
-import { RootState, addEditRider, addAuditLog, addNotification } from '../store';
+import { RootState, DeliveryPartner, addEditRider, addAuditLog, addNotification } from '../store';
 
 const DeliveryPartners: React.FC = () => {
   const theme = useTheme();
@@ -67,7 +67,7 @@ const DeliveryPartners: React.FC = () => {
     const rider = riders.find(r => r.id === riderId);
     if (!rider) return;
 
-    const nextStatus = rider.status === 'Offline' ? 'Available' : 'Offline';
+    const nextStatus: DeliveryPartner['status'] = rider.status === 'Offline' ? 'Available' : 'Offline';
 
     const updatedRider = {
       ...rider,
