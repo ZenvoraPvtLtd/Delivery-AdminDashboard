@@ -1,4 +1,5 @@
-import { configureStore, createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { configureStore, createSlice, PayloadAction, createAsyncThunk } from '@reduxjs/toolkit';
+import axios from 'axios';
 import { 
   Product, 
   Outlet, 
@@ -301,6 +302,17 @@ const rbacSlice = createSlice({
   }
 });
 
+// Async Thunks for Backend Integration
+export const fetchDb = createAsyncThunk('db/fetchDb', async () => {
+  try {
+    const response = await axios.get('/api/db');
+    return response.data;
+  } catch (err) {
+    console.warn('Backend server not responding, using offline mock database.', err);
+    return null;
+  }
+});
+
 // Mock Database Slice
 const dbSlice = createSlice({
   name: 'db',
@@ -500,8 +512,84 @@ const dbSlice = createSlice({
     deleteBanner(state, action: PayloadAction<string>) {
       state.banners = state.banners.filter(b => b.id !== action.payload);
     }
+  },
+  extraReducers: (builder) => {
+    builder.addCase(fetchDb.fulfilled, (state, action) => {
+      if (action.payload) {
+        state.outlets = action.payload.outlets || state.outlets;
+        state.products = action.payload.products || state.products;
+        state.deliveryPartners = action.payload.deliveryPartners || state.deliveryPartners;
+        state.orders = action.payload.orders || state.orders;
+        state.coupons = action.payload.coupons || state.coupons;
+        state.rawMaterials = action.payload.rawMaterials || state.rawMaterials;
+        state.tickets = action.payload.tickets || state.tickets;
+        state.auditLogs = action.payload.auditLogs || state.auditLogs;
+        state.customers = action.payload.customers || state.customers;
+        state.banners = action.payload.banners || state.banners;
+      }
+    });
   }
 });
+
+// Background Synchronization Middleware
+const syncMiddleware = (storeApi: any) => (next: any) => (action: any) => {
+  const result = next(action);
+  
+  if (action && action.type) {
+    const state = storeApi.getState();
+    
+    switch (action.type) {
+      case 'db/updateOrderStatus':
+        axios.post(`/api/orders/${action.payload.id}/status`, action.payload).catch(err => {
+          console.error('Failed to sync order status update with backend', err);
+        });
+        break;
+      case 'db/assignRider':
+        axios.post(`/api/orders/${action.payload.orderId}/assign-rider`, action.payload).catch(err => {
+          console.error('Failed to sync rider assignment with backend', err);
+        });
+        break;
+      case 'db/refundOrder':
+        axios.post(`/api/orders/${action.payload.orderId}/status`, {
+          status: 'Cancelled',
+          updatedBy: action.payload.updatedBy
+        }).catch(err => {
+          console.error('Failed to sync refund with backend', err);
+        });
+        break;
+      case 'db/toggleCouponStatus':
+        axios.post(`/api/coupons/${action.payload}/toggle`).catch(err => {
+          console.error('Failed to sync coupon toggle with backend', err);
+        });
+        break;
+      case 'db/adjustCustomerWallet':
+        axios.post(`/api/customers/${action.payload.id}/wallet`, action.payload).catch(err => {
+          console.error('Failed to sync wallet adjustment with backend', err);
+        });
+        break;
+      case 'db/updateCustomerStatus':
+        axios.post(`/api/customers/${action.payload.id}/status`, action.payload).catch(err => {
+          console.error('Failed to sync customer block status with backend', err);
+        });
+        break;
+      case 'db/toggleBannerStatus':
+        const banner = state.db.banners.find((b: any) => b.id === action.payload);
+        if (banner) {
+          axios.post(`/api/banners/${action.payload}/status`, { status: banner.status }).catch(err => {
+            console.error('Failed to sync banner status with backend', err);
+          });
+        }
+        break;
+      case 'db/addAuditLog':
+        axios.post('/api/audit-logs', action.payload).catch(err => {
+          console.error('Failed to sync audit log with backend', err);
+        });
+        break;
+    }
+  }
+  
+  return result;
+};
 
 // Configure Store
 export const store = configureStore({
@@ -510,7 +598,9 @@ export const store = configureStore({
     auth: authSlice.reducer,
     rbac: rbacSlice.reducer,
     db: dbSlice.reducer
-  }
+  },
+  middleware: (getDefaultMiddleware) => 
+    getDefaultMiddleware().concat(syncMiddleware)
 });
 
 // Exports Actions
@@ -556,6 +646,8 @@ export const {
   toggleBannerStatus,
   deleteBanner
 } = dbSlice.actions;
+
+
 
 export type RootState = ReturnType<typeof store.getState>;
 export type AppDispatch = typeof store.dispatch;

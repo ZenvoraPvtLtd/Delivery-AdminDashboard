@@ -120,7 +120,6 @@ const Orders: React.FC = () => {
       ipAddress: '127.0.0.1',
       browser: 'Admin Console'
     }));
-
     setRefundReason('');
     setShowRefundInput(false);
   };

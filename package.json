@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "serve": "npm run server",
+    "server": "node server/index.js",
     "build": "tsc && vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"
@@ -25,7 +27,9 @@
     "react-hook-form": "^7.49.3",
     "react-redux": "^9.1.0",
     "react-router-dom": "^6.21.3",
-    "recharts": "^2.10.4"
+    "recharts": "^2.10.4",
+    "express": "^4.19.2",
+    "cors": "^2.8.5"
   },
   "devDependencies": {
     "@types/canvas-confetti": "^1.6.4",
