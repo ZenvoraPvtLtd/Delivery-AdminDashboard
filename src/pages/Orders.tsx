@@ -537,23 +537,30 @@ const Orders: React.FC = () => {
                   </Typography>
                 </Box>
                 
-                {/* Visual grid simulating coordinates */}
+                {/* Interactive GIS OpenStreetMap Map Integration */}
                 <Box 
-                  className={mode === 'dark' ? 'map-grid-bg' : 'map-grid-bg-light'}
                   sx={{ 
                     height: 180, 
                     borderRadius: 4, 
                     border: `1px solid ${theme.palette.divider}`,
                     position: 'relative',
-                    overflow: 'hidden',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'flex-end',
-                    p: 1.5
+                    overflow: 'hidden'
                   }}
                 >
+                  <iframe 
+                    title="Order Route Map"
+                    width="100%" 
+                    height="100%" 
+                    frameBorder="0" 
+                    scrolling="no" 
+                    marginHeight={0} 
+                    marginWidth={0} 
+                    src="https://www.openstreetmap.org/export/embed.html?bbox=-74.0200%2C40.7100%2C-74.0000%2C40.7200&amp;layer=mapnik&amp;marker=40.7128%2C-74.0060"
+                    style={{ border: 0, filter: mode === 'dark' ? 'invert(90%) hue-rotate(180deg)' : 'none' }}
+                  />
+                  
                   {/* Pin kitchen */}
-                  <Box sx={{ position: 'absolute', left: '15%', bottom: '25%', display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 1 }}>
+                  <Box sx={{ position: 'absolute', left: '20%', bottom: '25%', display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 3, pointerEvents: 'none' }}>
                     <MapPin size={20} color="#047857" fill="#047857" />
                     <Typography variant="caption" sx={{ fontSize: '0.65rem', fontWeight: 700, px: 0.5, bgcolor: 'background.paper', borderRadius: 0.5 }}>Kitchen</Typography>
                   </Box>
@@ -562,14 +569,15 @@ const Orders: React.FC = () => {
                   <Box 
                     sx={{ 
                       position: 'absolute', 
-                      left: `${15 + (mapDetails.progress * 0.7)}%`, 
-                      bottom: `${25 + (mapDetails.progress * 0.55)}%`,
+                      left: `${20 + (mapDetails.progress * 0.6)}%`, 
+                      bottom: `${25 + (mapDetails.progress * 0.45)}%`,
                       transform: 'translate(-50%, -50%)',
                       display: 'flex', 
                       flexDirection: 'column', 
                       alignItems: 'center',
-                      zIndex: 2,
-                      transition: 'all 3s linear'
+                      zIndex: 4,
+                      transition: 'all 3s linear',
+                      pointerEvents: 'none'
                     }}
                   >
                     <Box 
@@ -593,7 +601,7 @@ const Orders: React.FC = () => {
                   </Box>
 
                   {/* Pin customer */}
-                  <Box sx={{ position: 'absolute', right: '15%', top: '20%', display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 1 }}>
+                  <Box sx={{ position: 'absolute', right: '20%', top: '20%', display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 3, pointerEvents: 'none' }}>
                     <MapPin size={20} color="#0D9488" fill="#0D9488" />
                     <Typography variant="caption" sx={{ fontSize: '0.65rem', fontWeight: 700, px: 0.5, bgcolor: 'background.paper', borderRadius: 0.5 }}>Customer</Typography>
                   </Box>

@@ -4,6 +4,7 @@ import { Navigate, useLocation, Link } from 'react-router-dom';
 import { Box, CssBaseline, Drawer, AppBar, Toolbar, useTheme, Alert, Snackbar, Button, Typography, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
 import Sidebar from './Sidebar';
 import Navbar from './Navbar';
+import ChatbotWidget from './ChatbotWidget';
 import { RootState, decrementSession, extendSession, logout } from '../store';
 import { AnimatePresence, motion } from 'framer-motion';
 
@@ -89,7 +90,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             flexGrow: 1,
             p: 3,
             width: { md: `calc(100% - ${drawerWidth}px)` },
-            mt: 8,
+            mt: 7,
           }}
         >
           <Box sx={{ mt: 4, textAlign: 'center', p: 4 }}>
@@ -126,7 +127,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           flexGrow: 1,
           p: { xs: 2, md: 3 },
           width: { md: `calc(100% - ${drawerWidth}px)` },
-          mt: 8,
+          mt: 7,
           overflowX: 'hidden'
         }}
       >
@@ -161,6 +162,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Admin Chatbot */}
+      <ChatbotWidget />
     </Box>
   );
 };

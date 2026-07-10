@@ -60,24 +60,29 @@ const themeOptions: ThemeOptions = {
       fontFamily: '"Outfit", sans-serif',
       fontWeight: 700,
       letterSpacing: '-0.03em',
+      color: '#1A1A1A',
     },
     h3: {
       fontFamily: '"Outfit", sans-serif',
       fontWeight: 600,
       letterSpacing: '-0.02em',
+      color: '#1A1A1A',
     },
     h4: {
       fontFamily: '"Outfit", sans-serif',
-      fontWeight: 600,
+      fontWeight: 700,
       letterSpacing: '-0.01em',
+      color: '#1A1A1A',
     },
     h5: {
       fontFamily: '"Outfit", sans-serif',
       fontWeight: 600,
+      color: '#1A1A1A',
     },
     h6: {
       fontFamily: '"Outfit", sans-serif',
       fontWeight: 600,
+      color: '#1A1A1A',
     },
     subtitle1: {
       fontWeight: 600,

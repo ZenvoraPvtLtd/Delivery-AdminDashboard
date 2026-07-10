@@ -425,6 +425,7 @@ const dbSlice = createSlice({
     toggleCouponStatus(state, action: PayloadAction<string>) {
       const coupon = state.coupons.find(c => c.id === action.payload);
       if (coupon) {
+        // Expired or Paused → Active; Active → Paused
         coupon.status = coupon.status === 'Active' ? 'Paused' : 'Active';
       }
     },
@@ -490,6 +491,12 @@ const dbSlice = createSlice({
         state.banners.push(action.payload);
       }
     },
+    toggleBannerStatus(state, action: PayloadAction<string>) {
+      const banner = state.banners.find(b => b.id === action.payload);
+      if (banner) {
+        banner.status = banner.status === 'Active' ? 'Paused' : 'Active';
+      }
+    },
     deleteBanner(state, action: PayloadAction<string>) {
       state.banners = state.banners.filter(b => b.id !== action.payload);
     }
@@ -546,6 +553,7 @@ export const {
   updateCustomerStatus,
   adjustCustomerWallet,
   addEditBanner,
+  toggleBannerStatus,
   deleteBanner
 } = dbSlice.actions;
 

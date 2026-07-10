@@ -3,14 +3,15 @@ import { useSelector, useDispatch } from 'react-redux';
 import { 
   AppBar, Toolbar, IconButton, Typography, Box, Select, MenuItem, 
   Menu, Badge, List, ListItem, ListItemText, Button, Tooltip, 
-  Avatar, FormControl, InputLabel, Divider, useTheme
+  Avatar, FormControl, Divider, useTheme, Chip, ListItemIcon
 } from '@mui/material';
 import { 
-  Menu as MenuIcon, Bell, Search, Globe, LogOut, CheckCircle2, AlertTriangle, ShieldCheck
+  Menu as MenuIcon, Bell, Globe, LogOut, CheckCircle2, AlertTriangle,
+  ShieldCheck, User, Settings, KeyRound, ScrollText, HelpCircle, RefreshCw
 } from 'lucide-react';
 import { 
   RootState, setActiveOutlet, markAllNotificationsRead, 
-  clearNotifications, loginRequest, addAuditLog 
+  clearNotifications, loginRequest, addAuditLog, logout 
 } from '../store';
 import { Role } from '../store';
 
@@ -30,6 +31,18 @@ const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
   const [profileAnchor, setProfileAnchor] = useState<null | HTMLElement>(null);
   
   const unreadNotifs = notifications.filter(n => !n.read).length;
+
+  const handleLogout = () => {
+    dispatch(addAuditLog({
+      username: user?.email || 'Unknown',
+      role: user?.role || 'Guest',
+      action: 'User logged out of admin panel',
+      module: 'Auth',
+      ipAddress: '127.0.0.1',
+      browser: 'Admin Console'
+    }));
+    dispatch(logout());
+  };
 
   const handleRoleChange = (newRole: Role) => {
     dispatch(loginRequest({
@@ -60,7 +73,7 @@ const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
 
   return (
     <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
-      <Toolbar sx={{ px: { xs: 2, md: 3 }, gap: 2, justifyContent: 'space-between' }}>
+      <Toolbar sx={{ px: { xs: 1.5, md: 2 }, gap: 1.5, minHeight: '56px !important', height: 56, justifyContent: 'space-between' }}>
         
         {/* Left Side: Mobile Menu Button & Global Search placeholder */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -123,15 +136,22 @@ const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
                 '& .MuiOutlinedInput-notchedOutline': { border: 'none' } 
               }}
             >
-              <MenuItem value="Super Admin">Super Admin</MenuItem>
-              <MenuItem value="Admin">Admin</MenuItem>
-              <MenuItem value="Outlet Manager">Outlet Manager</MenuItem>
-              <MenuItem value="Kitchen Manager">Kitchen Manager</MenuItem>
-              <MenuItem value="Delivery Manager">Delivery Manager</MenuItem>
-              <MenuItem value="Finance Manager">Finance Manager</MenuItem>
-              <MenuItem value="Inventory Manager">Inventory Manager</MenuItem>
-              <MenuItem value="Customer Support">Customer Support</MenuItem>
-              <MenuItem value="Marketing Manager">Marketing Manager</MenuItem>
+              {(() => {
+                const currentRole = user?.role || 'Super Admin';
+                const hasFullAccess = currentRole === 'Super Admin' || currentRole === 'Admin';
+                const rolesList = [
+                  'Super Admin', 'Admin', 'Outlet Manager', 'Kitchen Manager', 
+                  'Delivery Manager', 'Finance Manager', 'Inventory Manager', 
+                  'Customer Support', 'Marketing Manager'
+                ];
+                
+                // If Super Admin/Admin, show all options. Otherwise, show only the current individual role.
+                const visibleRoles = hasFullAccess ? rolesList : [currentRole];
+                
+                return visibleRoles.map(r => (
+                  <MenuItem key={r} value={r}>{r}</MenuItem>
+                ));
+              })()}
             </Select>
           </Box>
 
@@ -145,6 +165,8 @@ const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
               <Bell size={20} />
             </Badge>
           </IconButton>
+
+
           
           <Menu
             anchorEl={notifAnchor}
@@ -200,42 +222,167 @@ const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
             </Box>
           </Menu>
 
-          {/* User Profile Avatar dropdown */}
-          <Tooltip title="Profile Account">
-            <IconButton onClick={(e) => setProfileAnchor(e.currentTarget)} sx={{ p: 0 }}>
-              <Avatar 
-                sx={{ 
-                  bgcolor: 'primary.main', 
-                  width: 36, 
+          {/* User Profile Avatar dropdown — with online indicator */}
+          <Tooltip title="Profile">
+            <IconButton onClick={(e) => setProfileAnchor(e.currentTarget)} sx={{ p: 0, position: 'relative' }}>
+              <Avatar
+                sx={{
+                  bgcolor: 'primary.main',
+                  width: 36,
                   height: 36,
                   fontSize: '0.9rem',
                   fontWeight: 700,
                   boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
                 }}
               >
-                {user?.name.charAt(0) || 'A'}
+                {user?.name?.charAt(0) || 'A'}
               </Avatar>
+              {/* Online dot */}
+              <Box sx={{
+                position: 'absolute', bottom: 1, right: 1,
+                width: 9, height: 9, borderRadius: '50%',
+                bgcolor: '#22c55e', border: '1.5px solid white'
+              }} />
             </IconButton>
           </Tooltip>
-          
+
+          {/* Profile Dropdown Menu */}
           <Menu
             anchorEl={profileAnchor}
             open={Boolean(profileAnchor)}
             onClose={() => setProfileAnchor(null)}
-            PaperProps={{ sx: { width: 220, mt: 1.5, borderRadius: 3 } }}
+            PaperProps={{
+              sx: {
+                width: 240,
+                mt: 1.5,
+                borderRadius: 3,
+                boxShadow: '0 12px 40px rgba(0,0,0,0.12)',
+                overflow: 'hidden'
+              }
+            }}
+            transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+            anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
           >
-            <Box sx={{ px: 2, py: 1.5 }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>{user?.name}</Typography>
-              <Typography variant="body2" sx={{ color: 'text.secondary', fontSize: '0.75rem' }}>{user?.email}</Typography>
+            {/* Profile Header */}
+            <Box sx={{ px: 2.5, pt: 2.5, pb: 2, display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <Box sx={{ position: 'relative', flexShrink: 0 }}>
+                <Avatar
+                  sx={{
+                    bgcolor: 'primary.main',
+                    width: 46,
+                    height: 46,
+                    fontSize: '1.1rem',
+                    fontWeight: 800,
+                    boxShadow: '0 2px 8px rgba(27,67,50,0.2)'
+                  }}
+                >
+                  {user?.name?.charAt(0) || 'A'}
+                </Avatar>
+                <Box sx={{
+                  position: 'absolute', bottom: 1, right: 1,
+                  width: 11, height: 11, borderRadius: '50%',
+                  bgcolor: '#22c55e', border: '2px solid white'
+                }} />
+              </Box>
+              <Box sx={{ minWidth: 0 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 800, fontFamily: 'Outfit', fontSize: '0.95rem', color: '#1A1A1A', lineHeight: 1.2 }}>
+                  {user?.name || 'Admin User'}
+                </Typography>
+                <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.72rem', display: 'block', mt: 0.25 }}>
+                  {user?.email || 'admin@delivo.com'}
+                </Typography>
+                <Chip
+                  label={(user?.role || 'Super Admin').toUpperCase()}
+                  size="small"
+                  sx={{
+                    mt: 0.6,
+                    height: 18,
+                    fontSize: '0.6rem',
+                    fontWeight: 700,
+                    letterSpacing: '0.04em',
+                    bgcolor: 'rgba(59, 130, 246, 0.12)',
+                    color: '#2563EB',
+                    borderRadius: '4px',
+                    '& .MuiChip-label': { px: 1 }
+                  }}
+                />
+              </Box>
             </Box>
-            <Divider />
-            <MenuItem onClick={() => { setProfileAnchor(null); handleRoleChange('Super Admin'); }}>
-              Reset to Super Admin
-            </MenuItem>
-            <Divider />
-            <MenuItem onClick={() => { setProfileAnchor(null); dispatch(loginRequest({ email: user?.email || '', name: user?.name || '', role: user?.role || 'Super Admin', rememberMe: false })); }}>
-              Simulate 2FA Lock
-            </MenuItem>
+
+            <Divider sx={{ mx: 0 }} />
+
+            {/* Menu Items — role-based */}
+            <Box sx={{ py: 1 }}>
+              {(() => {
+                const role = user?.role || 'Super Admin';
+
+                // Full list of all options
+                const ALL_ITEMS = [
+                  { icon: RefreshCw,  label: 'Switch Role',       action: () => { setProfileAnchor(null); handleRoleChange('Super Admin'); } },
+                  { icon: User,       label: 'My Profile',        action: () => setProfileAnchor(null) },
+                  { icon: Settings,   label: 'Account Settings',  action: () => setProfileAnchor(null) },
+                  { icon: KeyRound,   label: 'Change Password',   action: () => setProfileAnchor(null) },
+                  { icon: ScrollText, label: 'Activity Log',      action: () => setProfileAnchor(null) },
+                  { icon: HelpCircle, label: 'Help & Support',    action: () => setProfileAnchor(null) },
+                ];
+
+                // Individual options per role
+                const ROLE_ITEMS: Record<string, string[]> = {
+                  'Outlet Manager':    ['My Profile', 'Account Settings', 'Change Password', 'Help & Support'],
+                  'Kitchen Manager':   ['My Profile', 'Change Password', 'Help & Support'],
+                  'Delivery Manager':  ['My Profile', 'Change Password', 'Help & Support'],
+                  'Finance Manager':   ['My Profile', 'Account Settings', 'Change Password', 'Activity Log', 'Help & Support'],
+                  'Inventory Manager': ['My Profile', 'Change Password', 'Help & Support'],
+                  'Customer Support':  ['My Profile', 'Change Password', 'Activity Log', 'Help & Support'],
+                  'Marketing Manager': ['My Profile', 'Account Settings', 'Change Password', 'Help & Support'],
+                };
+
+                const isFullAccess = role === 'Super Admin' || role === 'Admin';
+                const allowed = isFullAccess ? ALL_ITEMS : ALL_ITEMS.filter(item => (ROLE_ITEMS[role] || ['My Profile', 'Change Password', 'Help & Support']).includes(item.label));
+
+                return allowed.map(({ icon: Icon, label, action }) => (
+                  <MenuItem
+                    key={label}
+                    onClick={action}
+                    sx={{
+                      px: 2.5,
+                      py: 1,
+                      gap: 1.5,
+                      fontSize: '0.875rem',
+                      fontWeight: 500,
+                      color: 'text.primary',
+                      '&:hover': { bgcolor: 'rgba(27, 67, 50, 0.05)' },
+                      transition: 'background 0.15s'
+                    }}
+                  >
+                    <Icon size={16} style={{ color: '#6B6B6B', flexShrink: 0 }} />
+                    {label}
+                  </MenuItem>
+                ));
+              })()}
+            </Box>
+
+            <Divider sx={{ mx: 0 }} />
+
+            {/* Logout */}
+            <Box sx={{ py: 1 }}>
+              <MenuItem
+                onClick={() => { setProfileAnchor(null); handleLogout(); }}
+                sx={{
+                  px: 2.5,
+                  py: 1,
+                  gap: 1.5,
+                  fontSize: '0.875rem',
+                  fontWeight: 700,
+                  color: 'error.main',
+                  '&:hover': { bgcolor: 'rgba(155, 44, 44, 0.06)' },
+                  transition: 'background 0.15s'
+                }}
+              >
+                <LogOut size={16} style={{ flexShrink: 0 }} />
+                Logout
+              </MenuItem>
+            </Box>
           </Menu>
 
         </Box>

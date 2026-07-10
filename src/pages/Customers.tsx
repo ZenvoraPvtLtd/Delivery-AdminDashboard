@@ -28,6 +28,7 @@ const Customers: React.FC = () => {
   const [walletAmount, setWalletAmount] = useState('');
   const [walletDesc, setWalletDesc] = useState('');
   const [showWalletAdjust, setShowWalletAdjust] = useState(false);
+  const [editAddresses, setEditAddresses] = useState<Record<string, string[]>>({});
 
   const selectedCustomer = customers.find(c => c.id === selectedCustId);
 
@@ -190,15 +191,15 @@ const Customers: React.FC = () => {
         anchor="right"
         open={Boolean(selectedCustId)}
         onClose={() => { setSelectedCustId(null); setShowWalletAdjust(false); }}
-        PaperProps={{ sx: { width: { xs: '100%', sm: 460 }, p: 3 } }}
+        PaperProps={{ sx: { width: { xs: '100%', sm: 460 }, p: 0, display: 'flex', flexDirection: 'column', height: '100%' } }}
       >
         {selectedCustomer && (
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, height: '100%', overflowY: 'auto' }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, height: '100%', overflowY: 'auto', p: 3 }}>
             <Box>
               <Typography variant="h5" sx={{ fontFamily: 'Outfit', fontWeight: 800 }}>
                 Customer Profile
               </Typography>
-              <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
+              <Typography variant="body2" sx={{ color: 'text.secondary', mt: 1.5, lineHeight: 1.6 }}>
                 Registered details and past transaction summaries for <strong>{selectedCustomer.name}</strong>
               </Typography>
             </Box>
@@ -254,6 +255,7 @@ const Customers: React.FC = () => {
                     label="Transaction Amount ($)"
                     value={walletAmount}
                     onChange={(e) => setWalletAmount(e.target.value)}
+                    inputProps={{ min: 0, step: 'any' }}
                   />
                   <TextField
                     size="small"
@@ -275,10 +277,22 @@ const Customers: React.FC = () => {
             <Box>
               <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, fontFamily: 'Outfit' }}>Delivery Addresses</Typography>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                {selectedCustomer.addresses.map((addr, idx) => (
-                  <Box key={idx} sx={{ p: 1.5, border: `1px solid ${theme.palette.divider}`, borderRadius: 2, bgcolor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.01)' : 'rgba(0,0,0,0.01)' }}>
-                    <Typography variant="body2">{addr}</Typography>
-                  </Box>
+                {(editAddresses[selectedCustomer.id] ?? selectedCustomer.addresses).map((addr, idx) => (
+                  <TextField
+                    key={idx}
+                    size="small"
+                    fullWidth
+                    value={addr}
+                    onChange={(e) => {
+                      const updated = [...(editAddresses[selectedCustomer.id] ?? selectedCustomer.addresses)];
+                      updated[idx] = e.target.value;
+                      setEditAddresses(prev => ({ ...prev, [selectedCustomer.id]: updated }));
+                    }}
+                    sx={{
+                      '& .MuiOutlinedInput-root': { borderRadius: 2 },
+                      '& .MuiInputBase-input': { fontSize: '0.875rem' }
+                    }}
+                  />
                 ))}
               </Box>
             </Box>

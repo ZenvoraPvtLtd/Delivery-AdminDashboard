@@ -216,7 +216,6 @@ const RolePermissions: React.FC = () => {
                           <TableCell align="center">
                             <Checkbox 
                               checked={permissions.approve} 
-                              disabled={!['Orders', 'Inventory', 'Payments'].includes(module)}
                               onChange={() => handleCheckboxChange(module, 'approve')}
                               size="small"
                               color="primary"

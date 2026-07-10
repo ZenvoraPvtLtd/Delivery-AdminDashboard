@@ -207,7 +207,6 @@ const CouponsOffers: React.FC = () => {
                       control={
                         <Switch
                           checked={coupon.status === 'Active'}
-                          disabled={coupon.status === 'Expired'}
                           onChange={() => handleToggleStatus(coupon.id, coupon.code)}
                           color="success"
                           size="small"

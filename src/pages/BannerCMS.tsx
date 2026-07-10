@@ -11,7 +11,7 @@ import {
   Image, Plus, Trash2, Edit, FileSignature, 
   ChevronDown, HelpCircle, Save, Check 
 } from 'lucide-react';
-import { RootState, addEditBanner, deleteBanner, addAuditLog, addNotification } from '../store';
+import { RootState, addEditBanner, deleteBanner, toggleBannerStatus, addAuditLog, addNotification } from '../store';
 
 const BannerCMS: React.FC = () => {
   const theme = useTheme();
@@ -87,6 +87,26 @@ const BannerCMS: React.FC = () => {
         browser: 'Admin Console'
       }));
     }
+  };
+
+  const handleToggleBannerStatus = (id: string, title: string, currentStatus: string) => {
+    dispatch(toggleBannerStatus(id));
+    const nextStatus = currentStatus === 'Active' ? 'Paused' : 'Active';
+
+    dispatch(addNotification({
+      title: 'Banner Status Updated',
+      description: `Banner "${title}" set to ${nextStatus}.`,
+      type: 'system'
+    }));
+
+    dispatch(addAuditLog({
+      username: currentUser?.email || 'Simulator Client',
+      role: currentUser?.role || 'Guest',
+      action: `Toggled banner "${title}" status to ${nextStatus}`,
+      module: 'Banner Management',
+      ipAddress: '127.0.0.1',
+      browser: 'Admin Console'
+    }));
   };
 
   const handleCmsSave = () => {
@@ -180,7 +200,14 @@ const BannerCMS: React.FC = () => {
                     </Typography>
                     <Divider sx={{ mb: 2 }} />
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Chip label={ban.status} size="small" color={ban.status === 'Active' ? 'success' : 'default'} sx={{ fontWeight: 700 }} />
+                      <Chip 
+                        label={ban.status} 
+                        size="small" 
+                        color={ban.status === 'Active' ? 'success' : 'default'} 
+                        sx={{ fontWeight: 700, cursor: 'pointer' }}
+                        onClick={() => handleToggleBannerStatus(ban.id, ban.title, ban.status)}
+                        title={`Click to ${ban.status === 'Active' ? 'Pause' : 'Activate'}`}
+                      />
                       <IconButton size="small" color="error" onClick={() => handleDeleteBanner(ban.id, ban.title)}>
                         <Trash2 size={16} />
                       </IconButton>

@@ -177,28 +177,7 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onToggleSidebar }) => {
         </List>
       </Box>
 
-      {/* Logout Footer */}
-      <Box sx={{ p: 2 }}>
-        <ListItemButton 
-          onClick={() => dispatch(logout())}
-          sx={{ 
-            borderRadius: 2, 
-            py: 1.2, 
-            bgcolor: 'rgba(155, 44, 44, 0.04)',
-            color: 'error.main',
-            '&:hover': {
-              bgcolor: 'error.main',
-              color: 'white',
-              '& .MuiListItemIcon-root': { color: 'white' }
-            }
-          }}
-        >
-          <ListItemIcon sx={{ minWidth: 36, color: 'error.main' }}>
-            <LogOut size={18} />
-          </ListItemIcon>
-          <ListItemText primary="Sign Out" primaryTypographyProps={{ fontSize: '0.875rem', fontWeight: 600 }} />
-        </ListItemButton>
-      </Box>
+
     </Box>
   );
 

@@ -344,9 +344,8 @@ const DeliveryPartners: React.FC = () => {
                 Operational view of riders executing food dispatches.
               </Typography>
 
-              {/* Graphical simulation of map */}
+              {/* Premium Interactive OpenStreetMap Map Integration */}
               <Box 
-                className={theme.palette.mode === 'dark' ? 'map-grid-bg' : 'map-grid-bg-light'}
                 sx={{ 
                   height: 240, 
                   borderRadius: 3.5, 
@@ -355,51 +354,55 @@ const DeliveryPartners: React.FC = () => {
                   overflow: 'hidden'
                 }}
               >
-                {/* Center Store Pin */}
-                <Box sx={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 3 }}>
+                <iframe 
+                  title="Interactive Map"
+                  width="100%" 
+                  height="100%" 
+                  frameBorder="0" 
+                  scrolling="no" 
+                  marginHeight={0} 
+                  marginWidth={0} 
+                  src="https://www.openstreetmap.org/export/embed.html?bbox=-74.0150%2C40.7080%2C-73.9950%2C40.7180&amp;layer=mapnik&amp;marker=40.7128%2C-74.0060"
+                  style={{ border: 0, filter: theme.palette.mode === 'dark' ? 'invert(90%) hue-rotate(180deg)' : 'none' }}
+                />
+                {/* Center Store Pin Overlay */}
+                <Box sx={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 3, pointerEvents: 'none' }}>
                   <MapPin size={22} color="#047857" fill="#047857" />
                   <Typography variant="caption" sx={{ fontSize: '0.6rem', fontWeight: 800, bgcolor: 'background.paper', px: 0.5, py: 0.1, borderRadius: 0.5, border: `1px solid ${theme.palette.divider}` }}>Branch Hub</Typography>
                 </Box>
 
-                {/* Draw active dispatches */}
-                {activeDispatches.length === 0 ? (
-                  <Box sx={{ position: 'absolute', inset: 0, bgcolor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyItems: 'center', p: 3, zIndex: 4 }}>
-                    <Typography variant="body2" sx={{ color: 'white', textAlign: 'center', width: '100%', fontWeight: 600 }}>
-                      No active dispatches right now. Assign Available riders in the Orders desk.
-                    </Typography>
-                  </Box>
-                ) : (
-                  activeDispatches.map((r, idx) => {
-                    // Compute coordinate screen values relative to hub (50%, 50%)
-                    const screenX = 50 + (r.longitude - (-74.0060)) * 1200;
-                    const screenY = 50 - (r.latitude - 40.7128) * 1200;
-                    return (
-                      <Box 
-                        key={r.id} 
-                        sx={{ 
-                          position: 'absolute', 
-                          left: `${Math.max(10, Math.min(90, screenX))}%`, 
-                          top: `${Math.max(10, Math.min(90, screenY))}%`, 
-                          transform: 'translate(-50%, -50%)', 
-                          display: 'flex', 
-                          flexDirection: 'column', 
-                          alignItems: 'center',
-                          zIndex: 2
-                        }}
-                      >
-                        <Box sx={{ p: 0.6, bgcolor: 'success.main', borderRadius: '50%', boxShadow: '0 2px 8px rgba(0,0,0,0.3)', display: 'flex' }}>
-                          <Bike size={13} color="white" />
-                        </Box>
-                        <Typography variant="caption" sx={{ fontSize: '0.55rem', fontWeight: 700, bgcolor: 'background.paper', px: 0.4, borderRadius: 0.5 }}>
-                          {r.name.split(' ')[0]}
-                        </Typography>
+                {/* Draw active dispatches overlay */}
+                {activeDispatches.map((r, idx) => {
+                  // Compute coordinate screen values relative to hub
+                  const screenX = 50 + (r.longitude - (-74.0060)) * 1200;
+                  const screenY = 50 - (r.latitude - 40.7128) * 1200;
+                  return (
+                    <Box 
+                      key={r.id} 
+                      sx={{ 
+                        position: 'absolute', 
+                        left: `${Math.max(15, Math.min(85, screenX))}%`, 
+                        top: `${Math.max(15, Math.min(85, screenY))}%`, 
+                        transform: 'translate(-50%, -50%)', 
+                        display: 'flex', 
+                        flexDirection: 'column', 
+                        alignItems: 'center',
+                        zIndex: 2,
+                        pointerEvents: 'none'
+                      }}
+                    >
+                      <Box sx={{ p: 0.6, bgcolor: 'success.main', borderRadius: '50%', boxShadow: '0 2px 8px rgba(0,0,0,0.3)', display: 'flex' }}>
+                        <Bike size={13} color="white" />
                       </Box>
-                    );
-                  })
-                )}
+                      <Typography variant="caption" sx={{ fontSize: '0.55rem', fontWeight: 700, bgcolor: 'background.paper', px: 0.4, borderRadius: 0.5 }}>
+                        {r.name.split(' ')[0]}
+                      </Typography>
+                    </Box>
+                  );
+                })}
               </Box>
               <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', textAlign: 'center' }}>
-                Rider markers move dynamically along localized GPS grids.
+                Interactive GIS map overlay showing branch hubs and live dispatch lanes.
               </Typography>
             </CardContent>
           </Card>
