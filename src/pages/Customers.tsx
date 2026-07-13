@@ -7,7 +7,7 @@ import {
 } from '@mui/material';
 import { 
   Search, Eye, ShieldAlert, ShieldCheck, Wallet, 
-  Award, Heart, ShoppingBag, Plus, Minus 
+  Award, Heart, ShoppingBag, Plus, Minus, X
 } from 'lucide-react';
 import { 
   RootState, updateCustomerStatus, adjustCustomerWallet, 
@@ -191,17 +191,23 @@ const Customers: React.FC = () => {
         anchor="right"
         open={Boolean(selectedCustId)}
         onClose={() => { setSelectedCustId(null); setShowWalletAdjust(false); }}
+        sx={{ zIndex: 1300 }}
         PaperProps={{ sx: { width: { xs: '100%', sm: 460 }, p: 0, display: 'flex', flexDirection: 'column', height: '100%' } }}
       >
         {selectedCustomer && (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, height: '100%', overflowY: 'auto', p: 3 }}>
-            <Box>
-              <Typography variant="h5" sx={{ fontFamily: 'Outfit', fontWeight: 800 }}>
-                Customer Profile
-              </Typography>
-              <Typography variant="body2" sx={{ color: 'text.secondary', mt: 1.5, lineHeight: 1.6 }}>
-                Registered details and past transaction summaries for <strong>{selectedCustomer.name}</strong>
-              </Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <Box>
+                <Typography variant="h5" sx={{ fontFamily: 'Outfit', fontWeight: 800 }}>
+                  Customer Profile
+                </Typography>
+                <Typography variant="body2" sx={{ color: 'text.secondary', mt: 1.5, lineHeight: 1.6 }}>
+                  Registered details and past transaction summaries for <strong>{selectedCustomer.name}</strong>
+                </Typography>
+              </Box>
+              <IconButton onClick={() => { setSelectedCustId(null); setShowWalletAdjust(false); }} size="small">
+                <X size={20} />
+              </IconButton>
             </Box>
 
             <Divider />

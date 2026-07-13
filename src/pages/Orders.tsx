@@ -8,7 +8,7 @@ import {
 } from '@mui/material';
 import { 
   Search, Eye, Printer, UserCheck, XCircle, RotateCcw, Compass, MapPin, 
-  Bike, Calendar, CreditCard, DollarSign, Store, ShoppingBag
+  Bike, Calendar, CreditCard, DollarSign, Store, ShoppingBag, X
 } from 'lucide-react';
 import { 
   RootState, updateOrderStatus, assignRider, refundOrder, 
@@ -402,6 +402,7 @@ const Orders: React.FC = () => {
         anchor="right"
         open={Boolean(selectedOrderId)}
         onClose={() => { setSelectedOrderId(null); setShowRefundInput(false); }}
+        sx={{ zIndex: 1300 }}
         PaperProps={{ sx: { width: { xs: '100%', sm: 460 }, p: 3, borderLeft: `1px solid ${theme.palette.divider}` } }}
       >
         {selectedOrder && (
@@ -416,15 +417,20 @@ const Orders: React.FC = () => {
                   #{selectedOrder.id.split('-')[1]}
                 </Typography>
               </Box>
-              <Chip 
-                label={selectedOrder.status} 
-                color={
-                  selectedOrder.status === 'Delivered' ? 'success' : 
-                  selectedOrder.status === 'Cancelled' ? 'error' : 
-                  selectedOrder.status === 'Preparing' ? 'primary' : 'warning'
-                }
-                sx={{ fontWeight: 700, borderRadius: 2 }}
-              />
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Chip 
+                  label={selectedOrder.status} 
+                  color={
+                    selectedOrder.status === 'Delivered' ? 'success' : 
+                    selectedOrder.status === 'Cancelled' ? 'error' : 
+                    selectedOrder.status === 'Preparing' ? 'primary' : 'warning'
+                  }
+                  sx={{ fontWeight: 700, borderRadius: 2 }}
+                />
+                <IconButton onClick={() => { setSelectedOrderId(null); setShowRefundInput(false); }} size="small">
+                  <X size={20} />
+                </IconButton>
+              </Box>
             </Box>
 
             <Divider />
