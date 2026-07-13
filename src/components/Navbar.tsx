@@ -4,7 +4,8 @@ import {
   AppBar, Toolbar, IconButton, Typography, Box, Select, MenuItem, 
   Menu, Badge, List, ListItem, ListItemText, Button, Tooltip, 
   Avatar, FormControl, Divider, useTheme, Chip, ListItemIcon,
-  Dialog, DialogTitle, DialogContent, DialogActions, TextField, Grid, Table, TableBody, TableCell, TableHead, TableRow
+  Dialog, DialogTitle, DialogContent, DialogActions, TextField, Grid, 
+  Table, TableBody, TableCell, TableHead, TableRow, TableContainer, InputLabel
 } from '@mui/material';
 import { 
   Menu as MenuIcon, Bell, Globe, LogOut, CheckCircle2, AlertTriangle,
@@ -12,7 +13,8 @@ import {
 } from 'lucide-react';
 import { 
   RootState, setActiveOutlet, markAllNotificationsRead, 
-  clearNotifications, loginRequest, addAuditLog, logout, updateUserProfile
+  clearNotifications, loginRequest, addAuditLog, logout, updateUserProfile,
+  addNotification
 } from '../store';
 import { Role } from '../store';
 

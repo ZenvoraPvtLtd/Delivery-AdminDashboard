@@ -4,7 +4,8 @@ import {
   Box, Typography, Card, CardContent, Grid, Button, Table, 
   TableBody, TableCell, TableContainer, TableHead, TableRow, 
   Chip, Dialog, DialogTitle, DialogContent, DialogActions, 
-  TextField, FormControl, InputLabel, Select, MenuItem, useTheme, IconButton
+  TextField, FormControl, InputLabel, Select, MenuItem, useTheme, IconButton,
+  Avatar, Divider
 } from '@mui/material';
 import { Users, Plus, ShieldCheck, Trash2, KeyRound, Store, Eye } from 'lucide-react';
 import { RootState, addAuditLog, addNotification } from '../store';

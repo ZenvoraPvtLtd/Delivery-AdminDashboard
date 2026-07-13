@@ -13,3 +13,12 @@ pnpm-debug.log*
 
 .DS_Store
 Thumbs.db
+
+# Windows / Runner Wrapper
+powershell.cmd
+
+# Python Caches
+__pycache__/
+*.pyc
+*.pyo
+*.pyd

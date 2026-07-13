@@ -266,26 +266,26 @@
       "status": "Preparing",
       "paymentStatus": "Paid",
       "paymentMethod": "UPI",
-      "createdAt": "2026-07-10T10:06:34.652Z",
+      "createdAt": "2026-07-13T10:17:19.251Z",
       "preparationTimeRemaining": 8,
       "address": "Apt 4B, 32 Wall Street, Financial District, NY",
       "orderType": "Delivery",
       "timeline": [
         {
           "status": "Pending",
-          "timestamp": "2026-07-10T10:01:34.653Z",
+          "timestamp": "2026-07-13T10:12:19.252Z",
           "title": "Order Placed",
           "description": "Order successfully placed by customer."
         },
         {
           "status": "Pending",
-          "timestamp": "2026-07-10T10:02:34.653Z",
+          "timestamp": "2026-07-13T10:13:19.252Z",
           "title": "Order Confirmed",
           "description": "Payment verified and order sent to Kitchen."
         },
         {
           "status": "Preparing",
-          "timestamp": "2026-07-10T10:06:34.653Z",
+          "timestamp": "2026-07-13T10:17:19.252Z",
           "title": "Kitchen Accepted",
           "description": "Chef Sarah started preparing the items."
         }
@@ -316,38 +316,38 @@
       "status": "Out for Delivery",
       "paymentStatus": "Paid",
       "paymentMethod": "Card",
-      "createdAt": "2026-07-10T09:41:34.653Z",
+      "createdAt": "2026-07-13T09:52:19.252Z",
       "deliveryPartnerId": "rider-2",
       "address": "Floor 14, 52 Hudson Yards, Midtown West, NY",
       "orderType": "Delivery",
       "timeline": [
         {
           "status": "Pending",
-          "timestamp": "2026-07-10T09:41:34.653Z",
+          "timestamp": "2026-07-13T09:52:19.252Z",
           "title": "Order Placed",
           "description": "Order placed by customer."
         },
         {
           "status": "Pending",
-          "timestamp": "2026-07-10T09:42:34.653Z",
+          "timestamp": "2026-07-13T09:53:19.252Z",
           "title": "Order Confirmed",
           "description": "Auto-accepted and routed to kitchen."
         },
         {
           "status": "Preparing",
-          "timestamp": "2026-07-10T09:44:34.653Z",
+          "timestamp": "2026-07-13T09:55:19.252Z",
           "title": "Preparing",
           "description": "Oven heating, ingredients added."
         },
         {
           "status": "Ready",
-          "timestamp": "2026-07-10T09:58:34.653Z",
+          "timestamp": "2026-07-13T10:09:19.252Z",
           "title": "Packed & Ready",
           "description": "Food packed in insulation container."
         },
         {
           "status": "Out for Delivery",
-          "timestamp": "2026-07-10T10:06:34.653Z",
+          "timestamp": "2026-07-13T10:17:19.252Z",
           "title": "Handed Over to Rider",
           "description": "Rider Alex Mercer is transit with order."
         }
@@ -385,13 +385,13 @@
       "status": "Pending",
       "paymentStatus": "Unpaid",
       "paymentMethod": "Cash",
-      "createdAt": "2026-07-10T10:14:34.653Z",
+      "createdAt": "2026-07-13T10:25:19.252Z",
       "address": "Penthouse A, Wayne Tower, Manhattan, NY",
       "orderType": "Takeaway",
       "timeline": [
         {
           "status": "Pending",
-          "timestamp": "2026-07-10T10:14:34.653Z",
+          "timestamp": "2026-07-13T10:25:19.252Z",
           "title": "Order Received",
           "description": "Awaiting confirmation and cash check."
         }
@@ -429,32 +429,32 @@
       "status": "Delivered",
       "paymentStatus": "Paid",
       "paymentMethod": "Wallet",
-      "createdAt": "2026-07-10T09:01:34.653Z",
+      "createdAt": "2026-07-13T09:12:19.252Z",
       "deliveryPartnerId": "rider-3",
       "address": "Apt 2, 20 Ingram St, Queens, NY",
       "orderType": "Delivery",
       "timeline": [
         {
           "status": "Pending",
-          "timestamp": "2026-07-10T09:01:34.653Z",
+          "timestamp": "2026-07-13T09:12:19.252Z",
           "title": "Placed",
           "description": "Order successfully submitted."
         },
         {
           "status": "Preparing",
-          "timestamp": "2026-07-10T09:06:34.653Z",
+          "timestamp": "2026-07-13T09:17:19.252Z",
           "title": "Prepared",
           "description": "Ready for delivery."
         },
         {
           "status": "Out for Delivery",
-          "timestamp": "2026-07-10T09:26:34.653Z",
+          "timestamp": "2026-07-13T09:37:19.252Z",
           "title": "Dispatched",
           "description": "Rider on the way."
         },
         {
           "status": "Delivered",
-          "timestamp": "2026-07-10T09:46:34.653Z",
+          "timestamp": "2026-07-13T09:57:19.252Z",
           "title": "Delivered",
           "description": "Order hand-delivered by Maria Gonzalez."
         }
@@ -561,17 +561,17 @@
       "issueType": "Late Delivery",
       "priority": "High",
       "status": "Open",
-      "createdAt": "2026-07-10T10:11:34.653Z",
+      "createdAt": "2026-07-13T10:22:19.252Z",
       "messages": [
         {
           "sender": "customer",
           "text": "My burger is taking forever. It says preparing for 15 minutes now.",
-          "timestamp": "2026-07-10T10:11:34.653Z"
+          "timestamp": "2026-07-13T10:22:19.252Z"
         },
         {
           "sender": "system",
           "text": "Ticket opened and assigned to Support Queue.",
-          "timestamp": "2026-07-10T10:11:34.653Z"
+          "timestamp": "2026-07-13T10:22:19.252Z"
         }
       ]
     },
@@ -583,36 +583,36 @@
       "issueType": "Cold Food",
       "priority": "Medium",
       "status": "Resolved",
-      "createdAt": "2026-07-10T07:16:34.653Z",
+      "createdAt": "2026-07-13T07:27:19.252Z",
       "assignedStaff": "Support Rep Jenny",
       "messages": [
         {
           "sender": "customer",
           "text": "The buffalo wings were cold and soggy when they arrived.",
-          "timestamp": "2026-07-10T07:16:34.653Z"
+          "timestamp": "2026-07-13T07:27:19.252Z"
         },
         {
           "sender": "support",
           "text": "Apologies for the experience Peter! I have initiated a $5.00 wallet cashback refund for the inconvenience.",
-          "timestamp": "2026-07-10T07:26:34.653Z"
+          "timestamp": "2026-07-13T07:37:19.252Z"
         },
         {
           "sender": "customer",
           "text": "Thank you, received in my wallet.",
-          "timestamp": "2026-07-10T07:31:34.653Z"
+          "timestamp": "2026-07-13T07:42:19.252Z"
         },
         {
           "sender": "system",
           "text": "Ticket marked as Resolved.",
-          "timestamp": "2026-07-10T07:31:34.653Z"
+          "timestamp": "2026-07-13T07:42:19.252Z"
         }
       ]
     }
   ],
   "auditLogs": [
     {
-      "id": "log-1783925732486",
-      "timestamp": "2026-07-13T06:55:32.486Z",
+      "id": "log-1783939089682",
+      "timestamp": "2026-07-13T10:38:09.682Z",
       "username": "admin@delivo.com",
       "role": "Admin",
       "action": "2FA Verification Successful",
@@ -621,8 +621,8 @@
       "browser": "Chrome 126.0 (Windows)"
     },
     {
-      "id": "log-1783925726978",
-      "timestamp": "2026-07-13T06:55:26.978Z",
+      "id": "log-1783939079350",
+      "timestamp": "2026-07-13T10:37:59.350Z",
       "username": "admin@delivo.com",
       "role": "Admin",
       "action": "Attempt Login",
@@ -631,8 +631,8 @@
       "browser": "Chrome 126.0 (Windows)"
     },
     {
-      "id": "log-1783924739334",
-      "timestamp": "2026-07-13T06:38:59.334Z",
+      "id": "log-1783938984738",
+      "timestamp": "2026-07-13T10:36:24.738Z",
       "username": "admin@delivo.com",
       "role": "Admin",
       "action": "2FA Verification Successful",
@@ -641,8 +641,8 @@
       "browser": "Chrome 126.0 (Windows)"
     },
     {
-      "id": "log-1783924734705",
-      "timestamp": "2026-07-13T06:38:54.705Z",
+      "id": "log-1783938922351",
+      "timestamp": "2026-07-13T10:35:22.351Z",
       "username": "admin@delivo.com",
       "role": "Admin",
       "action": "Attempt Login",
@@ -651,28 +651,8 @@
       "browser": "Chrome 126.0 (Windows)"
     },
     {
-      "id": "log-1783924472573",
-      "timestamp": "2026-07-13T06:34:32.573Z",
-      "username": "superadmin@delivo.com",
-      "role": "Super Admin",
-      "action": "2FA Verification Successful",
-      "module": "Auth",
-      "ipAddress": "127.0.0.1",
-      "browser": "Chrome 126.0 (Windows)"
-    },
-    {
-      "id": "log-1783924468421",
-      "timestamp": "2026-07-13T06:34:28.421Z",
-      "username": "superadmin@delivo.com",
-      "role": "Super Admin",
-      "action": "Quick Login Selected",
-      "module": "Auth",
-      "ipAddress": "127.0.0.1",
-      "browser": "Chrome 126.0 (Windows)"
-    },
-    {
-      "id": "log-1783924457900",
-      "timestamp": "2026-07-13T06:34:17.900Z",
+      "id": "log-1783938593420",
+      "timestamp": "2026-07-13T10:29:53.420Z",
       "username": "admin@delivo.com",
       "role": "Admin",
       "action": "2FA Verification Successful",
@@ -681,8 +661,8 @@
       "browser": "Chrome 126.0 (Windows)"
     },
     {
-      "id": "log-1783924452964",
-      "timestamp": "2026-07-13T06:34:12.964Z",
+      "id": "log-1783938589355",
+      "timestamp": "2026-07-13T10:29:49.355Z",
       "username": "admin@delivo.com",
       "role": "Admin",
       "action": "Attempt Login",
@@ -691,28 +671,8 @@
       "browser": "Chrome 126.0 (Windows)"
     },
     {
-      "id": "log-1783686262063",
-      "timestamp": "2026-07-10T12:24:22.063Z",
-      "username": "admin@delio.com",
-      "role": "Admin",
-      "action": "2FA Verification Successful",
-      "module": "Auth",
-      "ipAddress": "127.0.0.1",
-      "browser": "Chrome 126.0 (Windows)"
-    },
-    {
-      "id": "log-1783686257109",
-      "timestamp": "2026-07-10T12:24:17.109Z",
-      "username": "admin@delio.com",
-      "role": "Admin",
-      "action": "Attempt Login",
-      "module": "Auth",
-      "ipAddress": "127.0.0.1",
-      "browser": "Chrome 126.0 (Windows)"
-    },
-    {
-      "id": "log-1783685987713",
-      "timestamp": "2026-07-10T12:19:47.713Z",
+      "id": "log-1783938558398",
+      "timestamp": "2026-07-13T10:29:18.398Z",
       "username": "admin@delivo.com",
       "role": "Admin",
       "action": "2FA Verification Successful",
@@ -721,8 +681,8 @@
       "browser": "Chrome 126.0 (Windows)"
     },
     {
-      "id": "log-1783685975963",
-      "timestamp": "2026-07-10T12:19:35.963Z",
+      "id": "log-1783938554584",
+      "timestamp": "2026-07-13T10:29:14.584Z",
       "username": "admin@delivo.com",
       "role": "Admin",
       "action": "Attempt Login",
@@ -731,148 +691,8 @@
       "browser": "Chrome 126.0 (Windows)"
     },
     {
-      "id": "log-1783685944516",
-      "timestamp": "2026-07-10T12:19:04.516Z",
-      "username": "kitchenmanager@delivo.com",
-      "role": "Kitchen Manager",
-      "action": "Quick Login Selected",
-      "module": "Auth",
-      "ipAddress": "127.0.0.1",
-      "browser": "Chrome 126.0 (Windows)"
-    },
-    {
-      "id": "log-1783685941663",
-      "timestamp": "2026-07-10T12:19:01.663Z",
-      "username": "kitchenmanager@delivo.com",
-      "role": "Kitchen Manager",
-      "action": "Quick Login Selected",
-      "module": "Auth",
-      "ipAddress": "127.0.0.1",
-      "browser": "Chrome 126.0 (Windows)"
-    },
-    {
-      "id": "log-1783685935527",
-      "timestamp": "2026-07-10T12:18:55.527Z",
-      "username": "rohitsen231133@acropolis.in",
-      "role": "Admin",
-      "action": "2FA Verification Successful",
-      "module": "Auth",
-      "ipAddress": "127.0.0.1",
-      "browser": "Chrome 126.0 (Windows)"
-    },
-    {
-      "id": "log-1783685930539",
-      "timestamp": "2026-07-10T12:18:50.541Z",
-      "username": "rohitsen231133@acropolis.in",
-      "role": "Admin",
-      "action": "Attempt Login",
-      "module": "Auth",
-      "ipAddress": "127.0.0.1",
-      "browser": "Chrome 126.0 (Windows)"
-    },
-    {
-      "id": "log-1783683822143",
-      "timestamp": "2026-07-10T11:43:42.143Z",
-      "username": "admin@delio.com",
-      "role": "Admin",
-      "action": "2FA Verification Successful",
-      "module": "Auth",
-      "ipAddress": "127.0.0.1",
-      "browser": "Chrome 126.0 (Windows)"
-    },
-    {
-      "id": "log-1783683816039",
-      "timestamp": "2026-07-10T11:43:36.040Z",
-      "username": "admin@delio.com",
-      "role": "Admin",
-      "action": "Attempt Login",
-      "module": "Auth",
-      "ipAddress": "127.0.0.1",
-      "browser": "Chrome 126.0 (Windows)"
-    },
-    {
-      "id": "log-1783682596138",
-      "timestamp": "2026-07-10T11:23:16.138Z",
-      "username": "admin@delio.com",
-      "role": "Admin",
-      "action": "2FA Verification Successful",
-      "module": "Auth",
-      "ipAddress": "127.0.0.1",
-      "browser": "Chrome 126.0 (Windows)"
-    },
-    {
-      "id": "log-1783682590776",
-      "timestamp": "2026-07-10T11:23:10.777Z",
-      "username": "admin@delio.com",
-      "role": "Admin",
-      "action": "Attempt Login",
-      "module": "Auth",
-      "ipAddress": "127.0.0.1",
-      "browser": "Chrome 126.0 (Windows)"
-    },
-    {
-      "id": "log-1783682138460",
-      "timestamp": "2026-07-10T11:15:38.460Z",
-      "username": "admin@delio.com",
-      "role": "Admin",
-      "action": "2FA Verification Successful",
-      "module": "Auth",
-      "ipAddress": "127.0.0.1",
-      "browser": "Chrome 126.0 (Windows)"
-    },
-    {
-      "id": "log-1783682133804",
-      "timestamp": "2026-07-10T11:15:33.804Z",
-      "username": "admin@delio.com",
-      "role": "Admin",
-      "action": "Attempt Login",
-      "module": "Auth",
-      "ipAddress": "127.0.0.1",
-      "browser": "Chrome 126.0 (Windows)"
-    },
-    {
-      "id": "log-1783682011942",
-      "timestamp": "2026-07-10T11:13:31.942Z",
-      "username": "admin@delio.com",
-      "role": "Admin",
-      "action": "2FA Verification Successful",
-      "module": "Auth",
-      "ipAddress": "127.0.0.1",
-      "browser": "Chrome 126.0 (Windows)"
-    },
-    {
-      "id": "log-1783682007455",
-      "timestamp": "2026-07-10T11:13:27.455Z",
-      "username": "admin@delio.com",
-      "role": "Admin",
-      "action": "Attempt Login",
-      "module": "Auth",
-      "ipAddress": "127.0.0.1",
-      "browser": "Chrome 126.0 (Windows)"
-    },
-    {
-      "id": "log-1783681394686",
-      "timestamp": "2026-07-10T11:03:14.686Z",
-      "username": "admin@delio.com",
-      "role": "Admin",
-      "action": "2FA Verification Successful",
-      "module": "Auth",
-      "ipAddress": "127.0.0.1",
-      "browser": "Chrome 126.0 (Windows)"
-    },
-    {
-      "id": "log-1783681388693",
-      "timestamp": "2026-07-10T11:03:08.693Z",
-      "username": "admin@delio.com",
-      "role": "Admin",
-      "action": "Attempt Login",
-      "module": "Auth",
-      "ipAddress": "127.0.0.1",
-      "browser": "Chrome 126.0 (Windows)"
-    },
-    {
-      "id": "log-1783680804425",
-      "timestamp": "2026-07-10T10:53:24.425Z",
+      "id": "log-1783938506286",
+      "timestamp": "2026-07-13T10:28:26.286Z",
       "username": "admin@delivo.com",
       "role": "Admin",
       "action": "2FA Verification Successful",
@@ -881,29 +701,9 @@
       "browser": "Chrome 126.0 (Windows)"
     },
     {
-      "id": "log-1783680798920",
-      "timestamp": "2026-07-10T10:53:18.920Z",
+      "id": "log-1783938502170",
+      "timestamp": "2026-07-13T10:28:22.170Z",
       "username": "admin@delivo.com",
-      "role": "Admin",
-      "action": "Attempt Login",
-      "module": "Auth",
-      "ipAddress": "127.0.0.1",
-      "browser": "Chrome 126.0 (Windows)"
-    },
-    {
-      "id": "log-1783678681702",
-      "timestamp": "2026-07-10T10:18:01.702Z",
-      "username": "admin@delio.com",
-      "role": "Admin",
-      "action": "2FA Verification Successful",
-      "module": "Auth",
-      "ipAddress": "127.0.0.1",
-      "browser": "Chrome 126.0 (Windows)"
-    },
-    {
-      "id": "log-1783678675527",
-      "timestamp": "2026-07-10T10:17:55.527Z",
-      "username": "admin@delio.com",
       "role": "Admin",
       "action": "Attempt Login",
       "module": "Auth",
@@ -918,7 +718,7 @@
       "module": "Auth",
       "ipAddress": "192.168.1.42",
       "browser": "Chrome 126.0 (Windows)",
-      "timestamp": "2026-07-10T06:16:34.653Z"
+      "timestamp": "2026-07-13T06:27:19.252Z"
     },
     {
       "id": "log-2",
@@ -928,7 +728,7 @@
       "module": "Products",
       "ipAddress": "192.168.1.88",
       "browser": "Firefox 125.0 (macOS)",
-      "timestamp": "2026-07-10T06:46:34.653Z"
+      "timestamp": "2026-07-13T06:57:19.252Z"
     },
     {
       "id": "log-3",
@@ -938,7 +738,7 @@
       "module": "Coupons",
       "ipAddress": "192.168.1.42",
       "browser": "Chrome 126.0 (Windows)",
-      "timestamp": "2026-07-10T08:16:34.653Z"
+      "timestamp": "2026-07-13T08:27:19.252Z"
     },
     {
       "id": "log-4",
@@ -948,7 +748,7 @@
       "module": "Orders",
       "ipAddress": "192.168.2.14",
       "browser": "Safari 17.2 (iOS)",
-      "timestamp": "2026-07-10T09:04:34.653Z"
+      "timestamp": "2026-07-13T09:15:19.252Z"
     }
   ],
   "customers": [

@@ -3,6 +3,7 @@ import cors from 'cors';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { answerChat } from './chatbot.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -240,6 +241,29 @@ function writeDb(data) {
 // REST Endpoints
 app.get('/api/db', (req, res) => {
   res.json(readDb());
+});
+
+app.post('/api/chat', async (req, res) => {
+  try {
+    const { message, history } = req.body || {};
+    const result = await answerChat({
+      message,
+      history,
+      db: readDb()
+    });
+
+    res.json({
+      success: true,
+      ...result
+    });
+  } catch (err) {
+    console.error('Chatbot endpoint failed:', err);
+    res.status(500).json({
+      success: false,
+      reply: 'I could not process that request right now. Please try again in a moment.',
+      error: 'CHATBOT_ERROR'
+    });
+  }
 });
 
 // Update Order status

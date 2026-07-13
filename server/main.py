@@ -4,7 +4,11 @@ from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 import json
 import os
+import sys
 from datetime import datetime
+
+# Ensure the server directory is in python path
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 app = FastAPI()
 
@@ -160,6 +164,30 @@ class AddressesUpdate(BaseModel):
 @app.get("/api/db")
 def get_db():
     return load_db()
+
+class ChatMessage(BaseModel):
+    sender: str
+    text: str
+
+class ChatRequest(BaseModel):
+    message: str
+    history: Optional[List[ChatMessage]] = []
+
+@app.post("/api/chat")
+async def chat_endpoint(payload: ChatRequest):
+    try:
+        from chatbot import answer_chat
+        db = load_db()
+        result = await answer_chat(
+            message=payload.message,
+            history=[h.model_dump() for h in payload.history] if payload.history else [],
+            db=db
+        )
+        return {"success": True, **result}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/orders/{order_id}/status")
 def update_order_status(order_id: str, payload: OrderStatusUpdate):
