@@ -35,8 +35,15 @@ const getBotReply = (input: string, context: { orders: number; customers: number
   if (q.match(/audit|log|history|activity/)) return `📝 Review all admin actions and system changes from the **Audit Logs** page — every action is tracked with timestamp, user, and IP.`;
   if (q.match(/help|what can you do|assist/)) return `🤖 I can help you with:\n• Order management\n• Customer profiles & wallets\n• Delivery partners & GPS\n• Coupons & banners\n• Inventory & stock alerts\n• Reports & analytics\n• User roles & permissions\n\nJust ask me anything!`;
   if (q.match(/thank|thanks|ok|great|good/)) return `😊 Happy to help! Let me know if you need anything else.`;
+  
+  // Conversational prompts
+  if (q.match(/how are you|how's it going/)) return `😊 I'm doing great! Ready to help you manage the Delivo Admin Panel. Ask me about active orders, outlet revenues, or financial settlements!`;
+  if (q.match(/who are you|your name/)) return `🤖 I am **DelivoBot**, your administrative virtual helper. I am optimized to explain the admin dashboard operations and guide you through managing outlets, orders, and user access roles!`;
+  if (q.match(/what is this|dashboard/)) return `📊 This is the **Delivo Admin Dashboard**, which displays live revenue metrics, kitchen prep queues, inventory status, and recent support tickets.`;
+  if (q.match(/create|add/)) return `➕ To create things in this admin panel:\n• Food items: Go to **Products** page → Click "Add Product"\n• Promo coupons: Go to **Coupons** page → Click "Create Coupon"\n• Staff accounts: Go to **User Management** page → Click "Create User Account"`;
+  if (q.match(/remove|delete/)) return `🗑️ To delete or revoke access:\n• Food items: Go to **Products** page → Click the Trash icon next to the item.\n• Banner slides: Go to **Banner & CMS** page → Click the Delete icon.\n• Staff accounts: Go to **User Management** page → Click the Revoke icon next to the user.`;
 
-  return `🔍 I'm not sure about that specific query. Try asking about:\n**orders, customers, riders, coupons, banners, inventory, reports, roles, or settings.**`;
+  return `💡 I'm here to support you with the **Delivo Admin Panel**! Regarding your query, you can explore the following modules:\n• **Dashboard**: View live metrics and the kitchen queue.\n• **Orders Desk**: Manage preparing, dispatching, and refunds.\n• **Payments**: Audit collections and export financial CSV reports.\n• **Security Logs**: View audit trails and export Excel logs.\n• **RBAC matrix**: Configure access roles and staff permissions.\n\nTell me what you'd like to do and I'll point you to the correct menu!`;
 };
 
 const QUICK_REPLIES = ['Active orders?', 'Customer count', 'Help', 'Coupons guide', 'Wallet adjustment'];
@@ -80,13 +87,13 @@ const ChatbotWidget: React.FC = () => {
     setInput('');
     setTyping(true);
 
-    // Fast reply — 400ms simulated thinking
+    // Fast reply — 150ms simulated thinking
     setTimeout(() => {
       const reply = getBotReply(userText, context);
       const botMsg: Message = { id: (Date.now() + 1).toString(), text: reply, sender: 'bot', timestamp: new Date() };
       setMessages(prev => [...prev, botMsg]);
       setTyping(false);
-    }, 400);
+    }, 150);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

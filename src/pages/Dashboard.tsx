@@ -13,7 +13,7 @@ import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, 
   BarChart, Bar, PieChart, Pie, Cell, LineChart, Line, Legend
 } from 'recharts';
-import { RootState, simulateRiderMovement, addNotification } from '../store';
+import { RootState, simulateRiderMovement, addNotification, addSimulatedOrder } from '../store';
 import StatCard from '../components/StatCard';
 
 const Dashboard: React.FC = () => {
@@ -36,14 +36,49 @@ const Dashboard: React.FC = () => {
   // Simulate random orders arriving to demonstrate live notification alerts
   useEffect(() => {
     const orderTimer = setInterval(() => {
-      // 15% chance of simulating a new order
-      if (Math.random() < 0.15) {
+      // 25% chance of simulating a new order every 8 seconds
+      if (Math.random() < 0.25) {
         const randomNames = ['Bruce Banner', 'Diana Prince', 'Clark Kent', 'Steve Rogers', 'Natasha Romanoff'];
         const randomProducts = products.filter(p => p.availability);
-        if (randomProducts.length === 0) return;
+        if (randomProducts.length === 0 || outlets.length === 0) return;
 
         const selectProd = randomProducts[Math.floor(Math.random() * randomProducts.length)];
         const customerName = randomNames[Math.floor(Math.random() * randomNames.length)];
+        const randomOutlet = outlets[Math.floor(Math.random() * outlets.length)];
+        const randomCustId = `cust-${Math.floor(Math.random() * 5) + 1}`;
+        
+        const subtotal = selectProd.price;
+        const tax = parseFloat((subtotal * (selectProd.gstRate / 100)).toFixed(2));
+        const deliveryCharge = 2.99;
+        const packagingCharge = 1.50;
+        const total = parseFloat((subtotal + tax + deliveryCharge + packagingCharge).toFixed(2));
+        
+        const orderId = `order-${Date.now().toString().slice(-3)}`;
+        
+        const newOrder = {
+          id: orderId,
+          customerId: randomCustId,
+          customerName: customerName,
+          customerPhone: `+1 555-${Math.floor(1000 + Math.random() * 9000)}`,
+          outletId: randomOutlet.id,
+          outletName: randomOutlet.name,
+          items: [{ productId: selectProd.id, name: selectProd.name, quantity: 1, price: selectProd.price, isVeg: selectProd.isVeg }],
+          subtotal,
+          tax,
+          deliveryCharge,
+          packagingCharge,
+          discount: 0,
+          total,
+          status: 'Pending' as const,
+          paymentStatus: 'Paid' as const,
+          paymentMethod: 'UPI' as const,
+          createdAt: new Date().toISOString(),
+          address: '124 Simulated Lane, New York, NY',
+          timeline: [{ status: 'Pending', timestamp: new Date().toISOString(), title: 'Order Placed', description: 'Order placed via simulated active live stream.' }],
+          orderType: 'Delivery' as const
+        };
+
+        dispatch(addSimulatedOrder(newOrder));
         
         dispatch(addNotification({
           title: 'New Delivery Order',
@@ -51,10 +86,10 @@ const Dashboard: React.FC = () => {
           type: 'order'
         }));
       }
-    }, 15000);
+    }, 8000);
     
     return () => clearInterval(orderTimer);
-  }, [dispatch, products]);
+  }, [dispatch, products, outlets]);
 
   // Filters based on chosen outlet in the global switcher
   const filteredOrders = orders.filter(o => activeOutletId === 'all' || o.outletId === activeOutletId);

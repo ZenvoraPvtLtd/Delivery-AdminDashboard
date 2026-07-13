@@ -281,6 +281,12 @@ const authSlice = createSlice({
         state.isAuthenticated = false;
         state.user = null;
       }
+    },
+    updateUserProfile(state, action: PayloadAction<{ name: string; email: string }>) {
+      if (state.user) {
+        state.user.name = action.payload.name;
+        state.user.email = action.payload.email;
+      }
     }
   }
 });
@@ -334,6 +340,9 @@ const dbSlice = createSlice({
   },
   reducers: {
     // Orders
+    addSimulatedOrder(state, action: PayloadAction<Order>) {
+      state.orders.unshift(action.payload);
+    },
     updateOrderStatus(state, action: PayloadAction<{ id: string; status: Order['status']; updatedBy: string }>) {
       const order = state.orders.find(o => o.id === action.payload.id);
       if (order) {
@@ -617,7 +626,8 @@ export const {
   verify2FA, 
   logout, 
   extendSession, 
-  decrementSession 
+  decrementSession,
+  updateUserProfile
 } = authSlice.actions;
 
 export const { 
@@ -626,6 +636,7 @@ export const {
 } = rbacSlice.actions;
 
 export const { 
+  addSimulatedOrder,
   updateOrderStatus, 
   assignRider, 
   refundOrder, 

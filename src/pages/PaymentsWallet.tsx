@@ -2,11 +2,11 @@ import React, { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { 
   Box, Typography, Card, CardContent, Grid, Table, TableBody, 
-  TableCell, TableContainer, TableHead, TableRow, Chip, useTheme 
+  TableCell, TableContainer, TableHead, TableRow, Chip, useTheme, Button 
 } from '@mui/material';
 import { 
   CreditCard, DollarSign, ArrowDownLeft, ArrowUpRight, 
-  Layers, CheckCircle2, ShieldCheck, HelpCircle 
+  Layers, CheckCircle2, ShieldCheck, HelpCircle, Download
 } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from 'recharts';
 import { RootState } from '../store';
@@ -35,16 +35,74 @@ const PaymentsWallet: React.FC = () => {
 
   const totalCollected = gatewayBreakdown.reduce((sum, g) => sum + g.value, 0);
 
+  const downloadCSV = () => {
+    const rows = [];
+    
+    // Section 1: Summary Stats
+    rows.push(["FINANCIAL SUMMARY"]);
+    rows.push(["Gross Collections", `$${totalCollected.toLocaleString()}`]);
+    rows.push(["Refund Settlements", "$420.50 Approved"]);
+    rows.push(["Bank Settlement Status", "Completed"]);
+    rows.push([]);
+    
+    // Section 2: Daily Outlet Collections
+    rows.push(["DAILY OUTLET COLLECTIONS"]);
+    rows.push(["Outlet Branch", "Digital Sales", "Cash Vault", "Settled Payout"]);
+    outlets.forEach(o => {
+      const digital = (o.revenue * 0.85).toFixed(2);
+      const cash = (o.revenue * 0.15).toFixed(2);
+      rows.push([o.name, `$${digital}`, `$${cash}`, `$${o.revenue}`]);
+    });
+    rows.push([]);
+    
+    // Section 3: Recent Transaction Audit Logs
+    rows.push(["RECENT TRANSACTION AUDIT LOGS"]);
+    rows.push(["Tx ID", "Order ID", "Customer Name", "Payment Gateway", "Transaction Type", "Amount", "Status", "Date"]);
+    transactionLedger.forEach(tx => {
+      rows.push([
+        tx.txId,
+        `#${tx.orderId.split('-')[1]}`,
+        tx.customer,
+        tx.gateway,
+        tx.type,
+        `${tx.type === 'Credit' ? '+' : '-'}$${tx.amount.toFixed(2)}`,
+        tx.status,
+        tx.date
+      ]);
+    });
+    
+    const csvContent = rows.map(e => e.map(val => `"${val.toString().replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `Delivo_Financial_Settlement_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <Box>
       {/* Title */}
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" sx={{ fontFamily: 'Outfit', fontWeight: 800 }}>
-          Financial Settlement & Gateway Audit
-        </Typography>
-        <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
-          View daily collections logs, configure refund settlements, and monitor gateway allocations
-        </Typography>
+      <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+        <Box>
+          <Typography variant="h4" sx={{ fontFamily: 'Outfit', fontWeight: 800 }}>
+            Financial Settlement & Gateway Audit
+          </Typography>
+          <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
+            View daily collections logs, configure refund settlements, and monitor gateway allocations
+          </Typography>
+        </Box>
+        <Button 
+          variant="contained" 
+          color="primary" 
+          startIcon={<Download size={16} />}
+          onClick={downloadCSV}
+          sx={{ borderRadius: 2, fontWeight: 700 }}
+        >
+          Export CSV File
+        </Button>
       </Box>
 
       {/* Stats summary cards */}

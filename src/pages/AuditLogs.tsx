@@ -3,9 +3,9 @@ import { useSelector } from 'react-redux';
 import { 
   Box, Typography, Card, CardContent, Grid, TextField, 
   FormControl, InputLabel, Select, MenuItem, Table, TableBody, 
-  TableCell, TableContainer, TableHead, TableRow, Chip, useTheme 
+  TableCell, TableContainer, TableHead, TableRow, Chip, useTheme, Button 
 } from '@mui/material';
-import { Search, Shield, History, Globe, Monitor } from 'lucide-react';
+import { Search, Shield, History, Globe, Monitor, FileSpreadsheet } from 'lucide-react';
 import { RootState } from '../store';
 
 const AuditLogs: React.FC = () => {
@@ -26,6 +26,27 @@ const AuditLogs: React.FC = () => {
     
     return matchesSearch && matchesModule;
   });
+
+  const downloadExcel = () => {
+    let html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">';
+    html += '<head><meta charset="utf-8"/><style>table { border-collapse: collapse; } th, td { border: 1px solid #ddd; padding: 8px; font-family: sans-serif; } th { background-color: #107C41; color: white; }</style></head>';
+    html += '<body><table><thead><tr>';
+    html += '<th>Timestamp</th><th>Admin Operator</th><th>Role Profile</th><th>Action Description</th><th>Module Target</th><th>IP Signature</th><th>Device Agent</th>';
+    html += '</tr></thead><tbody>';
+    filteredLogs.forEach(log => {
+      html += `<tr><td>${new Date(log.timestamp).toLocaleString()}</td><td>${log.username}</td><td>${log.role}</td><td>${log.action}</td><td>${log.module}</td><td>${log.ipAddress}</td><td>${log.browser}</td></tr>`;
+    });
+    html += '</tbody></table></body></html>';
+    
+    const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `Delivo_Audit_Logs_${new Date().toISOString().split('T')[0]}.xls`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   return (
     <Box>
@@ -68,10 +89,24 @@ const AuditLogs: React.FC = () => {
                 </Select>
               </FormControl>
             </Grid>
-            <Grid item xs={12} md={4} sx={{ textAlign: 'right' }}>
+            <Grid item xs={12} md={4} sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 2 }}>
               <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 600 }}>
                 Trace logs: {filteredLogs.length} events
               </Typography>
+              <Button 
+                variant="contained" 
+                color="success" 
+                startIcon={<FileSpreadsheet size={16} />}
+                onClick={downloadExcel}
+                sx={{ 
+                  borderRadius: 2, 
+                  bgcolor: '#107C41',
+                  '&:hover': { bgcolor: '#0B592E' },
+                  fontWeight: 700 
+                }}
+              >
+                Excel
+              </Button>
             </Grid>
           </Grid>
         </CardContent>

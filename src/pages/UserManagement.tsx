@@ -6,7 +6,7 @@ import {
   Chip, Dialog, DialogTitle, DialogContent, DialogActions, 
   TextField, FormControl, InputLabel, Select, MenuItem, useTheme, IconButton
 } from '@mui/material';
-import { Users, Plus, ShieldCheck, Trash2, KeyRound, Store } from 'lucide-react';
+import { Users, Plus, ShieldCheck, Trash2, KeyRound, Store, Eye } from 'lucide-react';
 import { RootState, addAuditLog, addNotification } from '../store';
 import { Role } from '../store';
 
@@ -18,6 +18,15 @@ const UserManagement: React.FC = () => {
   const outlets = useSelector((state: RootState) => state.db.outlets);
 
   const [addOpen, setAddOpen] = useState(false);
+  
+  // Profile view states
+  const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+
+  const handleViewProfile = (u: any) => {
+    setSelectedUser(u);
+    setIsProfileOpen(true);
+  };
   
   // Local simulated admin users list
   const [users, setUsers] = useState([
@@ -124,7 +133,7 @@ const UserManagement: React.FC = () => {
               <TableCell sx={{ fontWeight: 700 }}>System Role</TableCell>
               <TableCell sx={{ fontWeight: 700 }}>Mapped Branch</TableCell>
               <TableCell sx={{ fontWeight: 700 }}>Last Active</TableCell>
-              <TableCell sx={{ fontWeight: 700 }} align="center">Revoke</TableCell>
+              <TableCell sx={{ fontWeight: 700 }} align="center">Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -152,14 +161,23 @@ const UserManagement: React.FC = () => {
                   </Typography>
                 </TableCell>
                 <TableCell align="center">
-                  <IconButton 
-                    size="small" 
-                    color="error" 
-                    disabled={u.email === currentUser?.email}
-                    onClick={() => handleDeleteUser(u.id, u.name)}
-                  >
-                    <Trash2 size={15} />
-                  </IconButton>
+                  <Box sx={{ display: 'flex', justifyContent: 'center', gap: 0.5 }}>
+                    <IconButton 
+                      size="small" 
+                      color="primary"
+                      onClick={() => handleViewProfile(u)}
+                    >
+                      <Eye size={15} />
+                    </IconButton>
+                    <IconButton 
+                      size="small" 
+                      color="error" 
+                      disabled={u.email === currentUser?.email}
+                      onClick={() => handleDeleteUser(u.id, u.name)}
+                    >
+                      <Trash2 size={15} />
+                    </IconButton>
+                  </Box>
                 </TableCell>
               </TableRow>
             ))}
@@ -225,6 +243,63 @@ const UserManagement: React.FC = () => {
             <Button type="submit" variant="contained" color="primary">Create User</Button>
           </DialogActions>
         </form>
+      </Dialog>
+
+      {/* View User Profile Dialog */}
+      <Dialog 
+        open={isProfileOpen} 
+        onClose={() => { setIsProfileOpen(false); setSelectedUser(null); }} 
+        PaperProps={{ sx: { borderRadius: 4, width: 440 } }}
+      >
+        {selectedUser && (
+          <>
+            <DialogTitle sx={{ fontFamily: 'Outfit', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 1 }}>
+              <ShieldCheck size={20} style={{ color: theme.palette.primary.main }} />
+              Admin Member Profile
+            </DialogTitle>
+            <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, pt: 1 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, bgcolor: 'rgba(27,67,50,0.04)', p: 2.5, borderRadius: 3 }}>
+                <Avatar sx={{ bgcolor: 'primary.main', width: 52, height: 52, fontSize: '1.2rem', fontWeight: 800 }}>
+                  {selectedUser.name.charAt(0)}
+                </Avatar>
+                <Box>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 800, fontFamily: 'Outfit' }}>{selectedUser.name}</Typography>
+                  <Typography variant="body2" sx={{ color: 'text.secondary' }}>{selectedUser.email}</Typography>
+                  <Chip label={selectedUser.role} size="small" color="primary" sx={{ mt: 0.5, fontWeight: 700, borderRadius: 1 }} />
+                </Box>
+              </Box>
+              
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                <Box>
+                  <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, display: 'block' }}>ACCOUNT MEMBER ID</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 700 }}>{selectedUser.id}</Typography>
+                </Box>
+                <Divider />
+                <Box>
+                  <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, display: 'block' }}>MAPPED OPERATIONAL SCOPE</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 700 }}>{selectedUser.outlet}</Typography>
+                </Box>
+                <Divider />
+                <Box>
+                  <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, display: 'block' }}>LAST SESSION ACTIVE</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 700, color: selectedUser.lastActive === 'Active now' ? 'success.main' : 'text.primary' }}>
+                    {selectedUser.lastActive}
+                  </Typography>
+                </Box>
+                <Divider />
+                <Box>
+                  <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, display: 'block' }}>ACCESS PROFILE SIGNATURE</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.secondary', fontSize: '0.8rem' }}>
+                    IP: 192.168.1.{Math.floor(10 + Math.random() * 80)} | Browser: Admin Web Session
+                  </Typography>
+                </Box>
+              </Box>
+            </DialogContent>
+            <DialogActions sx={{ p: 2 }}>
+              <Button onClick={() => { setIsProfileOpen(false); setSelectedUser(null); }}>Close Profile</Button>
+            </DialogActions>
+          </>
+        )}
       </Dialog>
     </Box>
   );

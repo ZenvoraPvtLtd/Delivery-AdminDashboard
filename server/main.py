@@ -271,3 +271,8 @@ def add_audit_log(payload: dict):
     db.setdefault("auditLogs", []).insert(0, log)
     save_db(db)
     return {"success": True, "log": log}
+
+if __name__ == "__main__":
+    import uvicorn
+    # Start the FastAPI application on 127.0.0.1:8000
+    uvicorn.run(app, host="127.0.0.1", port=8000)
