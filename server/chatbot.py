@@ -160,22 +160,24 @@ def format_snapshot_text(snapshot: dict) -> str:
 def local_semantic_agent(input_data: dict) -> str:
     question = input_data.get("question", "").strip()
     db = input_data.get("db", {})
+    history = input_data.get("history", "")
     snapshot = build_dashboard_snapshot(db)
     
     q = question.lower()
     
     # 1. Greetings
-    if any(k in q for k in ['hello', 'hi', 'hey', 'namaste', 'greetings']):
+    query_words = set(re.findall(r'\w+', q))
+    if any(w in query_words for w in ['hello', 'hi', 'hey', 'namaste', 'greetings', 'help']) or 'what can you do' in q:
         t = snapshot["totals"]
         return (
             f"Hello! I'm **DelivoBot**, your LangChain admin assistant. "
-            f"I have direct access to your database snapshot.\n\n"
+            f"I have direct access to your database snapshot and can answer questions about orders, products, customers, and inventory.\n\n"
             f"**Current Status Summary:**\n"
             f"- 📦 **{t['activeOrders']} active orders** are currently in progress.\n"
             f"- 🛵 **{t['availableRiders']} riders** are available for dispatch.\n"
             f"- ⚠️ **{t['lowStockItems']} items** have triggered low-stock alerts.\n"
             f"- 🎫 **{t['openTickets']} tickets** are active in the support queue.\n\n"
-            f"Ask me about any specific order, customer profile, or stock item!"
+            f"Ask me about any specific order (e.g. 'order-101'), customer profile (e.g. 'Bruce Wayne'), or stock item!"
         )
     
     # 2. Products / Menu items search (e.g. "pizza", "burger", "latte", "salad", "wings", "toast")
@@ -215,13 +217,37 @@ def local_semantic_agent(input_data: dict) -> str:
             f"You can toggle availability or edit parameters in the [Central Menu & Products Registry](/products)."
         )
 
-    # 3. Specific Order Details Lookups (e.g. order-101)
+    # 3. Specific Order Details Lookups (e.g. order-101 or context reference from history)
+    target_order_id = None
     order_match = re.search(r'order-(\d+)', q)
     if order_match:
-        target_id = f"order-{order_match.group(1)}"
+        target_order_id = f"order-{order_match.group(1)}"
+    else:
+        # Check if the query asks about a previous order status/payment/rider/address/items
+        relative_words = ['status', 'paid', 'payment', 'rider', 'deliver', 'address', 'items', 'where', 'who', 'cancel', 'refund', 'it', 'him', 'her']
+        if any(w in q for w in relative_words):
+            history_orders = re.findall(r'order-(\d+)', history.lower())
+            if history_orders:
+                target_order_id = f"order-{history_orders[-1]}"
+
+    if target_order_id:
         orders = db.get("orders", [])
-        order = next((o for o in orders if o.get("id", "").lower() == target_id), None)
+        order = next((o for o in orders if o.get("id", "").lower() == target_order_id), None)
         if order:
+            if 'paid' in q or 'payment' in q:
+                return f"💰 The payment status for Order **{order.get('id')}** is **{order.get('paymentStatus')}** via **{order.get('paymentMethod')}** (Total: **${float(order.get('total', 0)):.2f}**)."
+            if 'rider' in q or 'who' in q or 'delivery partner' in q:
+                if order.get('deliveryPartnerId'):
+                    riders = db.get("deliveryPartners", [])
+                    rider = next((r for r in riders if r.get("id") == order.get('deliveryPartnerId')), None)
+                    rider_name = rider.get("name") if rider else "Assigned Rider"
+                    return f"🛵 Order **{order.get('id')}** is assigned to rider **{rider_name}** (ID: `{order.get('deliveryPartnerId')}`)."
+                return f"🛵 Order **{order.get('id')}** does not have an assigned rider yet. You can assign one in the [Orders Page](/orders)."
+            if 'status' in q or 'where' in q:
+                return f"📦 Order **{order.get('id')}** is currently in **{order.get('status')}** stage. Current timeline event: *{order.get('timeline', [{}])[-1].get('description')}*."
+            if 'address' in q or 'where' in q:
+                return f"📍 The delivery address for Order **{order.get('id')}** is **{order.get('address')}**."
+            
             items_str = "\n".join([
                 f"  - {item.get('quantity')}x **{item.get('name')}** (${float(item.get('price', 0)):.2f})"
                 for item in order.get("items", [])
@@ -242,13 +268,13 @@ def local_semantic_agent(input_data: dict) -> str:
                 f"*Action: You can manage this order on the [Orders Page](/orders).*"
             )
         else:
-            return f"I searched the database but could not find any order with ID **{target_id.upper()}**. Please double check the ID."
+            return f"I searched the database but could not find any order with ID **{target_order_id.upper()}**. Please double check the ID."
 
-    # 3. Active Orders List
+    # 4. Active Orders List
     if 'order' in q:
         orders = snapshot["highlights"]["activeOrders"]
         if not orders:
-            return "There are no active orders in progress at the moment. You can create or view historical records on the [Orders Page](/orders)."
+            return "There are no active orders in progress at the moment. You can view records on the [Orders Page](/orders)."
         orders_str = "\n".join([
             f"1. **{o['id']}** - {o['customer']} ({o['status']} - **{o['total']}** | Payment: {o['payment']})"
             for o in orders
@@ -258,8 +284,8 @@ def local_semantic_agent(input_data: dict) -> str:
             f"{orders_str}\n\n"
             f"You can assign riders or update status codes in [Orders Desk](/orders)."
         )
-        
-    # 4. Low Stock / Inventory
+
+    # 5. Low Stock / Inventory
     if any(k in q for k in ['stock', 'inventory', 'raw', 'material', 'supplier', 'qty']):
         low_stock_list = snapshot["highlights"]["lowStock"]
         if not low_stock_list:
@@ -274,7 +300,7 @@ def local_semantic_agent(input_data: dict) -> str:
             f"You can review suppliers and update stock logs in [Inventory Management](/inventory)."
         )
 
-    # 5. Riders / Delivery Partners
+    # 6. Riders / Delivery Partners
     if any(k in q for k in ['rider', 'delivery partner', 'driver', 'gps', 'vehicle']):
         riders = snapshot["highlights"]["availableRiders"]
         totals = snapshot["totals"]
@@ -293,22 +319,44 @@ def local_semantic_agent(input_data: dict) -> str:
             f"Ready for assignments. Manage GPS coordinates on the [Delivery Partners Page](/delivery-partners)."
         )
 
-    # 6. Customer lookup (e.g. "Marcus", "Bruce", "Clara")
+    # 7. Customer lookup (e.g. "Marcus", "Bruce", "Clara" or context reference from history)
+    target_customer = None
     customers = db.get("customers", [])
     for cust in customers:
-        if cust.get("name", "").lower() in q or q in cust.get("name", "").lower() or cust.get("id", "").lower() in q:
-            addr_str = ", ".join(cust.get("addresses", []))
-            fav_str = ", ".join(cust.get("favoriteItems", []))
-            return (
-                f"### 👤 Customer Profile: **{cust.get('name')}**\n"
-                f"- **Customer ID**: `{cust.get('id')}` | Status: `{'🟢 Active' if cust.get('status') == 'Active' else '🔴 Blocked'}`\n"
-                f"- **Contact**: {cust.get('email')} (📞 {cust.get('phone')})\n"
-                f"- **Wallet Balance**: **${float(cust.get('walletBalance', 0)):.2f}**\n"
-                f"- **Reward Points**: `{cust.get('rewardPoints', 0):,} Points`\n"
-                f"- **Delivery Addresses**: {addr_str or 'No address saved'}\n"
-                f"- **Favorite Dishes**: {fav_str or 'None recorded'}\n\n"
-                f"*Action: View transactions or apply wallet balance adjustments on [Customer Profiles](/customers).*"
-            )
+        if cust.get("name", "").lower() in q or cust.get("id", "").lower() in q:
+            target_customer = cust
+            break
+            
+    if not target_customer:
+        cust_relative_words = ['wallet', 'balance', 'points', 'reward', 'address', 'phone', 'email', 'blocked', 'he', 'she', 'his', 'her']
+        if any(w in q for w in cust_relative_words):
+            for cust in customers:
+                if cust.get("name", "").lower() in history.lower():
+                    target_customer = cust
+                    
+    if target_customer:
+        if 'wallet' in q or 'balance' in q:
+            return f"💵 **{target_customer.get('name')}** has a wallet balance of **${float(target_customer.get('walletBalance', 0)):.2f}**."
+        if 'points' in q or 'reward' in q:
+            return f"🪙 **{target_customer.get('name')}** has **{target_customer.get('rewardPoints', 0):,}** reward points."
+        if 'address' in q or 'live' in q:
+            addr_str = ", ".join(target_customer.get("addresses", []))
+            return f"📍 The registered addresses for **{target_customer.get('name')}** are: {addr_str or 'No address saved'}."
+        if 'phone' in q or 'email' in q or 'contact' in q:
+            return f"📞 Contact details for **{target_customer.get('name')}**: Phone: {target_customer.get('phone')}, Email: {target_customer.get('email')}."
+        
+        addr_str = ", ".join(target_customer.get("addresses", []))
+        fav_str = ", ".join(target_customer.get("favoriteItems", []))
+        return (
+            f"### 👤 Customer Profile: **{target_customer.get('name')}**\n"
+            f"- **Customer ID**: `{target_customer.get('id')}` | Status: `{'🟢 Active' if target_customer.get('status') == 'Active' else '🔴 Blocked'}`\n"
+            f"- **Contact**: {target_customer.get('email')} (📞 {target_customer.get('phone')})\n"
+            f"- **Wallet Balance**: **${float(target_customer.get('walletBalance', 0)):.2f}**\n"
+            f"- **Reward Points**: `{target_customer.get('rewardPoints', 0):,} Points`\n"
+            f"- **Delivery Addresses**: {addr_str or 'No address saved'}\n"
+            f"- **Favorite Dishes**: {fav_str or 'None recorded'}\n\n"
+            f"*Action: View transactions or apply wallet balance adjustments on [Customer Profiles](/customers).*"
+        )
 
     if 'customer' in q:
         totals = snapshot["totals"]
@@ -319,7 +367,7 @@ def local_semantic_agent(input_data: dict) -> str:
             f"Please search for a customer name specifically (e.g. 'Tell me about Bruce Wayne') or visit the [Customer Registry](/customers)."
         )
 
-    # 7. Support Tickets / Reviews
+    # 8. Support Tickets / Reviews
     if any(k in q for k in ['ticket', 'complaint', 'review', 'feedback', 'soggy', 'cold', 'late']):
         tickets = snapshot["highlights"]["openTickets"]
         totals = snapshot["totals"]
@@ -393,47 +441,8 @@ local_chain = RunnableSequence(
 def create_llm_chain():
     openai_key = os.getenv("OPENAI_API_KEY")
     gemini_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
-    huggingface_token = os.getenv("HUGGINGFACEHUB_API_TOKEN") or os.getenv("HF_TOKEN")
     
-    if huggingface_token:
-        try:
-            import requests
-            from langchain_core.runnables import RunnableLambda
-            
-            def huggingface_inference_api(inputs) -> str:
-                prompt_str = inputs.to_string()
-                
-                # We use the Mistral-7B-Instruct-v0.2 model which is free, fast, and highly accurate.
-                model_id = "mistralai/Mistral-7B-Instruct-v0.2"
-                api_url = f"https://api-inference.huggingface.co/models/{model_id}"
-                headers = {"Authorization": f"Bearer {huggingface_token}"}
-                
-                payload = {
-                    "inputs": prompt_str,
-                    "parameters": {
-                        "max_new_tokens": 512,
-                        "temperature": 0.2,
-                        "return_full_text": False
-                    }
-                }
-                
-                res = requests.post(api_url, headers=headers, json=payload, timeout=15)
-                if res.status_code != 200:
-                    raise Exception(f"Hugging Face Inference API error ({res.status_code}): {res.text}")
-                
-                result = res.json()
-                if isinstance(result, list) and len(result) > 0:
-                    return result[0].get("generated_text", "").strip()
-                elif isinstance(result, dict) and "generated_text" in result:
-                    return result["generated_text"].strip()
-                return str(result).strip()
-                
-            model = RunnableLambda(huggingface_inference_api)
-            source = "langchain-huggingface"
-        except Exception as e:
-            print(f"Hugging Face initialization failed: {str(e)}")
-            return None, None
-    elif gemini_key:
+    if gemini_key:
         try:
             from langchain_google_genai import ChatGoogleGenerativeAI
             model = ChatGoogleGenerativeAI(
@@ -516,7 +525,7 @@ async def answer_chat(message: str, history: List[Dict[str, Any]] = None, db: Di
             print(f"LangChain LLM invocation failed, using local chain fallback: {str(e)}")
             
     # Fallback to local semantic chain
-    reply = await local_chain.ainvoke({"question": question, "db": db})
+    reply = await local_chain.ainvoke({"question": question, "db": db, "history": safe_history})
     return {
         "reply": reply,
         "source": "langchain-local-rag",
