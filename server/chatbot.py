@@ -178,7 +178,44 @@ def local_semantic_agent(input_data: dict) -> str:
             f"Ask me about any specific order, customer profile, or stock item!"
         )
     
-    # 2. Specific Order Details Lookups (e.g. order-101)
+    # 2. Products / Menu items search (e.g. "pizza", "burger", "latte", "salad", "wings", "toast")
+    products = db.get("products", [])
+    matched_products = []
+    
+    query_words = set(re.findall(r'\w+', q))
+    for p in products:
+        name_words = set(re.findall(r'\w+', p.get("name", "").lower()))
+        common_words = name_words.intersection(query_words)
+        matching_keywords = [w for w in common_words if len(w) > 3 or w in ['veg', 'egg']]
+        
+        if matching_keywords or p.get("subcategory", "").lower() in q or p.get("category", "").lower() in q:
+            matched_products.append(p)
+            
+    if matched_products:
+        prod_details = []
+        for p in matched_products[:3]: # limit to 3 matches max
+            avail_status = "🟢 Available" if p.get("availability") else "🔴 Out of Stock"
+            veg_tag = "🥬 Veg" if p.get("isVeg") else "🥩 Non-Veg"
+            best_seller_tag = "⭐ Bestseller" if p.get("isBestSeller") else ""
+            discount_info = f"({p.get('discount')}% Off)" if p.get("discount", 0) > 0 else ""
+            
+            prod_details.append(
+                f"### 🍔 **{p.get('name')}** {best_seller_tag}\n"
+                f"- **Category**: {p.get('category')} ({p.get('subcategory')}) | **Tag**: {veg_tag}\n"
+                f"- **Price**: **${p.get('price'):.2f}** {discount_info}\n"
+                f"- **Availability**: **{avail_status}**\n"
+                f"- **Prep Time**: `{p.get('preparationTime')} mins`\n"
+                f"- **Description**: *{p.get('description')}*"
+            )
+        
+        products_str = "\n\n".join(prod_details)
+        return (
+            f"Here are the matching products from the menu registry:\n\n"
+            f"{products_str}\n\n"
+            f"You can toggle availability or edit parameters in the [Central Menu & Products Registry](/products)."
+        )
+
+    # 3. Specific Order Details Lookups (e.g. order-101)
     order_match = re.search(r'order-(\d+)', q)
     if order_match:
         target_id = f"order-{order_match.group(1)}"
