@@ -356,8 +356,47 @@ local_chain = RunnableSequence(
 def create_llm_chain():
     openai_key = os.getenv("OPENAI_API_KEY")
     gemini_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+    huggingface_token = os.getenv("HUGGINGFACEHUB_API_TOKEN") or os.getenv("HF_TOKEN")
     
-    if gemini_key:
+    if huggingface_token:
+        try:
+            import requests
+            from langchain_core.runnables import RunnableLambda
+            
+            def huggingface_inference_api(inputs) -> str:
+                prompt_str = inputs.to_string()
+                
+                # We use the Mistral-7B-Instruct-v0.2 model which is free, fast, and highly accurate.
+                model_id = "mistralai/Mistral-7B-Instruct-v0.2"
+                api_url = f"https://api-inference.huggingface.co/models/{model_id}"
+                headers = {"Authorization": f"Bearer {huggingface_token}"}
+                
+                payload = {
+                    "inputs": prompt_str,
+                    "parameters": {
+                        "max_new_tokens": 512,
+                        "temperature": 0.2,
+                        "return_full_text": False
+                    }
+                }
+                
+                res = requests.post(api_url, headers=headers, json=payload, timeout=15)
+                if res.status_code != 200:
+                    raise Exception(f"Hugging Face Inference API error ({res.status_code}): {res.text}")
+                
+                result = res.json()
+                if isinstance(result, list) and len(result) > 0:
+                    return result[0].get("generated_text", "").strip()
+                elif isinstance(result, dict) and "generated_text" in result:
+                    return result["generated_text"].strip()
+                return str(result).strip()
+                
+            model = RunnableLambda(huggingface_inference_api)
+            source = "langchain-huggingface"
+        except Exception as e:
+            print(f"Hugging Face initialization failed: {str(e)}")
+            return None, None
+    elif gemini_key:
         try:
             from langchain_google_genai import ChatGoogleGenerativeAI
             model = ChatGoogleGenerativeAI(
