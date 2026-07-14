@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "start": "node server/start-all.js",
     "dev": "vite",
     "serve": "npm run server",
     "server": "node server/start.js",
