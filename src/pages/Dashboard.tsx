@@ -4,7 +4,7 @@ import axios from 'axios';
 import { 
   Grid, Card, CardContent, Typography, Box, Button, ButtonGroup, 
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, 
-  Chip, List, ListItem, ListItemText, LinearProgress, useTheme 
+  Chip, List, ListItem, ListItemText, LinearProgress, useTheme, Tooltip as MuiTooltip
 } from '@mui/material';
 import { 
   TrendingUp, ShoppingCart, DollarSign, Users, AlertTriangle, 
@@ -25,6 +25,19 @@ const Dashboard: React.FC = () => {
   const { orders, products, deliveryPartners, rawMaterials, tickets, outlets } = useSelector((state: RootState) => state.db);
 
   const [salesTab, setSalesTab] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
+  const [isStreamActive, setIsStreamActive] = useState(true);
+
+  const handleToggleStream = () => {
+    const newState = !isStreamActive;
+    setIsStreamActive(newState);
+    dispatch(addNotification({
+      title: newState ? 'Live Stream Resumed' : 'Live Stream Paused',
+      description: newState 
+        ? 'Incoming order simulator is now active.' 
+        : 'Incoming order simulator has been paused.',
+      type: 'system'
+    }));
+  };
 
   // Trigger GPS Simulator loop for active orders map
   useEffect(() => {
@@ -36,6 +49,8 @@ const Dashboard: React.FC = () => {
 
   // Simulate random orders arriving to demonstrate live notification alerts
   useEffect(() => {
+    if (!isStreamActive) return;
+
     const orderTimer = setInterval(() => {
       // 25% chance of simulating a new order every 8 seconds
       if (Math.random() < 0.25) {
@@ -91,7 +106,7 @@ const Dashboard: React.FC = () => {
     }, 8000);
     
     return () => clearInterval(orderTimer);
-  }, [dispatch, products, outlets]);
+  }, [dispatch, products, outlets, isStreamActive]);
 
   // Filters based on chosen outlet in the global switcher
   const filteredOrders = orders.filter(o => activeOutletId === 'all' || o.outletId === activeOutletId);
@@ -181,17 +196,61 @@ const Dashboard: React.FC = () => {
           </Typography>
         </Box>
         <Box sx={{ display: 'flex', gap: 1 }}>
-          <Chip 
-            icon={<Flame size={14} color="#1B4332" />} 
-            label="Live Order Stream Active" 
-            variant="outlined"
-            sx={{ 
-              fontWeight: 600, 
-              color: 'primary.main', 
-              borderColor: 'primary.main',
-              bgcolor: 'rgba(27, 67, 50, 0.05)'
-            }} 
-          />
+          <MuiTooltip title={isStreamActive ? "Click to Pause live order stream simulation" : "Click to Resume live order stream simulation"}>
+            <Chip 
+              icon={
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, pl: 0.5 }}>
+                  <Flame 
+                    size={14} 
+                    style={{ 
+                      transition: 'all 0.3s ease',
+                      transform: isStreamActive ? 'scale(1.15)' : 'scale(1.0)',
+                      opacity: isStreamActive ? 1 : 0.5,
+                      color: isStreamActive ? '#E65C00' : 'inherit'
+                    }} 
+                  />
+                  {isStreamActive && (
+                    <Box sx={{
+                      width: 6,
+                      height: 6,
+                      borderRadius: '50%',
+                      bgcolor: '#4ade80',
+                      animation: 'pulse-dot 1.5s infinite',
+                      '@keyframes pulse-dot': {
+                        '0%': { transform: 'scale(0.8)', opacity: 0.5 },
+                        '50%': { transform: 'scale(1.3)', opacity: 1 },
+                        '100%': { transform: 'scale(0.8)', opacity: 0.5 }
+                      }
+                    }} />
+                  )}
+                </Box>
+              } 
+              label={isStreamActive ? "Live Order Stream Active" : "Live Stream Paused"} 
+              variant={isStreamActive ? "filled" : "outlined"}
+              onClick={handleToggleStream}
+              sx={{ 
+                fontWeight: 700, 
+                cursor: 'pointer',
+                fontFamily: 'Outfit',
+                transition: 'all 0.3s ease',
+                ...(isStreamActive ? {
+                  bgcolor: 'primary.main',
+                  color: 'white',
+                  boxShadow: '0 4px 12px rgba(27, 67, 50, 0.25)',
+                  '&:hover': {
+                    bgcolor: 'primary.dark',
+                  }
+                } : {
+                  bgcolor: 'action.hover',
+                  color: 'text.secondary',
+                  borderColor: 'divider',
+                  '&:hover': {
+                    bgcolor: 'action.selected',
+                  }
+                })
+              }} 
+            />
+          </MuiTooltip>
         </Box>
       </Box>
 
