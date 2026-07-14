@@ -74,10 +74,19 @@ const RolePermissions: React.FC = () => {
         <Box sx={{ display: 'flex', gap: 1.5 }}>
           <Button 
             variant="outlined" 
-            color="inherit" 
+            color="primary" 
             onClick={handleReset} 
             startIcon={<RefreshCw size={16} />}
-            sx={{ borderRadius: 2 }}
+            sx={{ 
+              borderRadius: 2,
+              fontWeight: 600,
+              fontFamily: 'Outfit',
+              borderWidth: '1.5px',
+              '&:hover': {
+                borderWidth: '1.5px',
+                bgcolor: 'rgba(27, 67, 50, 0.05)'
+              }
+            }}
           >
             Reset Defaults
           </Button>
