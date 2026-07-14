@@ -300,6 +300,51 @@ def add_audit_log(payload: dict):
     save_db(db)
     return {"success": True, "log": log}
 
+class TimelineEvent(BaseModel):
+    status: str
+    timestamp: str
+    title: str
+    description: str
+
+class OrderItem(BaseModel):
+    productId: str
+    name: str
+    quantity: int
+    price: float
+    isVeg: bool
+
+class NewOrderPayload(BaseModel):
+    id: str
+    customerId: str
+    customerName: str
+    customerPhone: str
+    outletId: str
+    outletName: str
+    items: List[OrderItem]
+    subtotal: float
+    tax: float
+    deliveryCharge: float
+    packagingCharge: float
+    discount: float
+    total: float
+    status: str
+    paymentStatus: str
+    paymentMethod: str
+    createdAt: str
+    address: str
+    timeline: List[TimelineEvent]
+    orderType: str
+
+@app.post("/api/orders")
+def create_order(payload: NewOrderPayload):
+    db = load_db()
+    if any(o["id"] == payload.id for o in db.get("orders", [])):
+        return {"success": True, "message": "Order already exists"}
+    
+    db.setdefault("orders", []).insert(0, payload.model_dump())
+    save_db(db)
+    return {"success": True, "order": payload}
+
 if __name__ == "__main__":
     import uvicorn
     # Start the FastAPI application on 127.0.0.1:8000

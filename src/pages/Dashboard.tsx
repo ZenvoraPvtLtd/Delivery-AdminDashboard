@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
+import axios from 'axios';
 import { 
   Grid, Card, CardContent, Typography, Box, Button, ButtonGroup, 
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, 
@@ -79,6 +80,7 @@ const Dashboard: React.FC = () => {
         };
 
         dispatch(addSimulatedOrder(newOrder));
+        axios.post('/api/orders', newOrder).catch(err => console.warn('Failed to sync simulated order:', err));
         
         dispatch(addNotification({
           title: 'New Delivery Order',
