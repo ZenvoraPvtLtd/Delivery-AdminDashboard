@@ -165,6 +165,7 @@ interface Notification {
   type: 'order' | 'stock' | 'system' | 'ticket';
   timestamp: string;
   read: boolean;
+  linkId?: string;
 }
 
 interface UIState {
@@ -203,6 +204,10 @@ const uiSlice = createSlice({
     },
     markAllNotificationsRead(state) {
       state.notifications.forEach(n => n.read = true);
+    },
+    markNotificationRead(state, action: PayloadAction<string>) {
+      const notif = state.notifications.find(n => n.id === action.payload);
+      if (notif) notif.read = true;
     },
     clearNotifications(state) {
       state.notifications = [];
@@ -618,6 +623,7 @@ export const {
   setActiveOutlet, 
   addNotification, 
   markAllNotificationsRead, 
+  markNotificationRead,
   clearNotifications 
 } = uiSlice.actions;
 

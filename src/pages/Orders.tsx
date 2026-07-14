@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
+import { useLocation } from 'react-router-dom';
 import { 
   Box, Typography, Card, CardContent, Table, TableBody, TableCell, 
   TableContainer, TableHead, TableRow, Chip, IconButton, Button, 
@@ -19,6 +20,7 @@ import { Order, DeliveryPartner } from '../store';
 const Orders: React.FC = () => {
   const theme = useTheme();
   const dispatch = useDispatch();
+  const location = useLocation();
 
   const currentUser = useSelector((state: RootState) => state.auth.user);
   const { activeOutletId, mode } = useSelector((state: RootState) => state.ui);
@@ -32,6 +34,16 @@ const Orders: React.FC = () => {
   const [showRefundInput, setShowRefundInput] = useState(false);
 
   const selectedOrder = orders.find(o => o.id === selectedOrderId);
+
+  // Auto-open order details drawer if navigated with openOrderId state
+  useEffect(() => {
+    const state = location.state as { openOrderId?: string } | null;
+    if (state?.openOrderId) {
+      setSelectedOrderId(state.openOrderId);
+      // Clear navigation state to avoid re-triggering drawer on navigation actions
+      window.history.replaceState({}, document.title);
+    }
+  }, [location]);
   
   // Find delivery partner for the selected order if assigned
   const assignedRiderInfo = deliveryPartners.find(r => r.id === selectedOrder?.deliveryPartnerId);

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import { 
   AppBar, Toolbar, IconButton, Typography, Box, Select, MenuItem, 
   Menu, Badge, List, ListItem, ListItemText, Button, Tooltip, 
@@ -14,7 +15,7 @@ import {
 import { 
   RootState, setActiveOutlet, markAllNotificationsRead, 
   clearNotifications, loginRequest, addAuditLog, logout, updateUserProfile,
-  addNotification
+  addNotification, markNotificationRead
 } from '../store';
 import { Role } from '../store';
 
@@ -30,10 +31,35 @@ const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
   const { user } = useSelector((state: RootState) => state.auth);
   const outlets = useSelector((state: RootState) => state.db.outlets);
 
+  const navigate = useNavigate();
+
   const [notifAnchor, setNotifAnchor] = useState<null | HTMLElement>(null);
   const [profileAnchor, setProfileAnchor] = useState<null | HTMLElement>(null);
   
   const unreadNotifs = notifications.filter(n => !n.read).length;
+
+  const handleNotifClick = (notif: any) => {
+    dispatch(markNotificationRead(notif.id));
+    setNotifAnchor(null);
+    
+    let linkId = notif.linkId;
+    if (!linkId && notif.type === 'order') {
+      const matchHash = notif.description?.match(/#(\d+)/) || notif.title?.match(/#(\d+)/);
+      if (matchHash) {
+        linkId = `order-${matchHash[1]}`;
+      }
+    }
+    
+    if (notif.type === 'order') {
+      navigate('/orders', { state: { openOrderId: linkId } });
+    } else if (notif.type === 'stock') {
+      navigate('/inventory');
+    } else if (notif.type === 'ticket') {
+      navigate('/reviews-complaints');
+    } else {
+      navigate('/dashboard');
+    }
+  };
   
   const rbac = useSelector((state: RootState) => state.rbac);
   const auditLogs = useSelector((state: RootState) => state.db.auditLogs);
@@ -226,11 +252,17 @@ const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
                 {notifications.map((notif) => (
                   <ListItem 
                     key={notif.id}
+                    onClick={() => handleNotifClick(notif)}
                     sx={{ 
                       py: 1.5,
                       alignItems: 'flex-start',
                       gap: 1.5,
-                      bgcolor: notif.read ? 'transparent' : 'rgba(27, 67, 50, 0.04)'
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      bgcolor: notif.read ? 'transparent' : 'rgba(27, 67, 50, 0.04)',
+                      '&:hover': {
+                        bgcolor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(27, 67, 50, 0.08)'
+                      }
                     }}
                   >
                     <Box sx={{ mt: 0.5 }}>

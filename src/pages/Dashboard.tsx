@@ -100,7 +100,8 @@ const Dashboard: React.FC = () => {
         dispatch(addNotification({
           title: 'New Delivery Order',
           description: `${customerName} ordered ${selectProd.name} ($${selectProd.price.toFixed(2)})`,
-          type: 'order'
+          type: 'order',
+          linkId: newOrder.id
         }));
       }
     }, 8000);
