@@ -341,7 +341,33 @@ const dbSlice = createSlice({
       { id: 'ban-1', title: 'Monsoon Special Combo 25%', image: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=600', status: 'Active', type: 'Homepage', schedule: '2026-07-01 to 2026-07-31' },
       { id: 'ban-2', title: 'Avocado Toast Weekend Sale', image: 'https://images.unsplash.com/photo-1525351484163-7529414344d8?w=600', status: 'Active', type: 'Offer', schedule: 'Saturday & Sunday' },
       { id: 'ban-3', title: 'Happy Hour BOGO Pop-up', image: 'https://images.unsplash.com/photo-1536256263959-770b48d82b0a?w=600', status: 'Paused', type: 'Popup', schedule: 'Daily 4 PM - 7 PM' }
-    ]
+    ],
+    notifications: [] as any[],
+    conversations: [] as any[],
+    communicationSettings: {
+      enableWhatsapp: true,
+      enableSms: true,
+      defaultProvider: 'meta',
+      whatsappProvider: 'meta',
+      smsProvider: 'twilio',
+      apiKeys: {
+        metaToken: '',
+        twilioSid: '',
+        twilioAuthToken: '',
+        msg91Key: '',
+        textlocalKey: '',
+        fast2smsKey: ''
+      },
+      webhookSecret: '',
+      retryCount: 3,
+      confirmationExpiry: 24,
+      templates: {
+        confirmation: '',
+        cancellation: '',
+        success: '',
+        reminder: ''
+      }
+    } as any
   },
   reducers: {
     // Orders
@@ -525,6 +551,39 @@ const dbSlice = createSlice({
     },
     deleteBanner(state, action: PayloadAction<string>) {
       state.banners = state.banners.filter(b => b.id !== action.payload);
+    },
+    setCommunicationSettings(state, action: PayloadAction<any>) {
+      state.communicationSettings = action.payload;
+    },
+    addNotificationLog(state, action: PayloadAction<any>) {
+      if (!state.notifications) state.notifications = [];
+      if (!state.notifications.some(n => n.id === action.payload.id)) {
+        state.notifications.unshift(action.payload);
+      }
+    },
+    updateNotificationLog(state, action: PayloadAction<any>) {
+      if (!state.notifications) state.notifications = [];
+      const idx = state.notifications.findIndex(n => n.id === action.payload.id);
+      if (idx !== -1) {
+        state.notifications[idx] = action.payload;
+      }
+    },
+    addConversationLog(state, action: PayloadAction<any>) {
+      if (!state.conversations) state.conversations = [];
+      if (!state.conversations.some(c => c.id === action.payload.id)) {
+        state.conversations.push(action.payload);
+      }
+    },
+    updateOrderConfirmation(state, action: PayloadAction<any>) {
+      const idx = state.orders.findIndex(o => o.id === action.payload.id);
+      if (idx !== -1) {
+        state.orders[idx] = { ...state.orders[idx], ...action.payload };
+      } else {
+        state.orders.unshift(action.payload);
+      }
+    },
+    setConversations(state, action: PayloadAction<any[]>) {
+      state.conversations = action.payload;
     }
   },
   extraReducers: (builder) => {
@@ -540,6 +599,9 @@ const dbSlice = createSlice({
         state.auditLogs = action.payload.auditLogs || state.auditLogs;
         state.customers = action.payload.customers || state.customers;
         state.banners = action.payload.banners || state.banners;
+        state.notifications = action.payload.notifications || state.notifications || [];
+        state.conversations = action.payload.conversations || state.conversations || [];
+        state.communicationSettings = action.payload.communicationSettings || state.communicationSettings || {};
       }
     });
   }
@@ -661,7 +723,13 @@ export const {
   adjustCustomerWallet,
   addEditBanner,
   toggleBannerStatus,
-  deleteBanner
+  deleteBanner,
+  setCommunicationSettings,
+  addNotificationLog,
+  updateNotificationLog,
+  addConversationLog,
+  updateOrderConfirmation,
+  setConversations
 } = dbSlice.actions;
 
 

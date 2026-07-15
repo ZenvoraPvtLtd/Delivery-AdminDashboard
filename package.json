@@ -7,7 +7,7 @@
     "start": "node server/start-all.js",
     "dev": "vite",
     "serve": "npm run server",
-    "server": "node server/start.js",
+    "server": "node server/index.js",
     "build": "tsc && vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"
@@ -32,7 +32,8 @@
     "react-router-dom": "^6.21.3",
     "recharts": "^2.10.4",
     "express": "^4.19.2",
-    "cors": "^2.8.5"
+    "cors": "^2.8.5",
+    "socket.io": "^4.7.4"
   },
   "devDependencies": {
     "@types/canvas-confetti": "^1.6.4",

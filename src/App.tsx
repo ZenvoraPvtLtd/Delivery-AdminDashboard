@@ -27,6 +27,8 @@ import UserManagement from './pages/UserManagement';
 import RolePermissions from './pages/RolePermissions';
 import AuditLogs from './pages/AuditLogs';
 import Settings from './pages/Settings';
+import OrderConfirmationCenter from './pages/OrderConfirmationCenter';
+import CommunicationSettings from './pages/CommunicationSettings';
 
 const App: React.FC = () => {
   const mode = useSelector((state: RootState) => state.ui.mode);
@@ -62,6 +64,8 @@ const App: React.FC = () => {
                 <Route path="/role-permissions" element={<RolePermissions />} />
                 <Route path="/audit-logs" element={<AuditLogs />} />
                 <Route path="/settings" element={<Settings />} />
+                <Route path="/confirmation-center" element={<OrderConfirmationCenter />} />
+                <Route path="/settings/communication" element={<CommunicationSettings />} />
                 {/* Fallback to dashboard */}
                 <Route path="*" element={<Navigate to="/dashboard" replace />} />
               </Routes>

@@ -235,6 +235,117 @@
   ],
   "orders": [
     {
+      "id": "order-782",
+      "customerId": "cust-4",
+      "customerName": "Bruce Banner",
+      "customerPhone": "+1 555-9365",
+      "outletId": "out-2",
+      "outletName": "West End Cafe",
+      "items": [
+        {
+          "productId": "prod-5",
+          "name": "Crispy Buffalo Chicken Wings (8pcs)",
+          "quantity": 1,
+          "price": 11.99,
+          "isVeg": false
+        }
+      ],
+      "subtotal": 11.99,
+      "tax": 2.16,
+      "deliveryCharge": 2.99,
+      "packagingCharge": 1.5,
+      "discount": 0.0,
+      "total": 18.64,
+      "status": "Pending",
+      "paymentStatus": "Paid",
+      "paymentMethod": "UPI",
+      "createdAt": "2026-07-14T11:55:57.782Z",
+      "address": "124 Simulated Lane, New York, NY",
+      "timeline": [
+        {
+          "status": "Pending",
+          "timestamp": "2026-07-14T11:55:57.782Z",
+          "title": "Order Placed",
+          "description": "Order placed via simulated active live stream."
+        }
+      ],
+      "orderType": "Delivery"
+    },
+    {
+      "id": "order-797",
+      "customerId": "cust-4",
+      "customerName": "Clark Kent",
+      "customerPhone": "+1 555-4968",
+      "outletId": "out-2",
+      "outletName": "West End Cafe",
+      "items": [
+        {
+          "productId": "prod-6",
+          "name": "Premium Veggie Salad Bowl",
+          "quantity": 1,
+          "price": 10.99,
+          "isVeg": true
+        }
+      ],
+      "subtotal": 10.99,
+      "tax": 0.55,
+      "deliveryCharge": 2.99,
+      "packagingCharge": 1.5,
+      "discount": 0.0,
+      "total": 16.03,
+      "status": "Pending",
+      "paymentStatus": "Paid",
+      "paymentMethod": "UPI",
+      "createdAt": "2026-07-14T11:55:49.797Z",
+      "address": "124 Simulated Lane, New York, NY",
+      "timeline": [
+        {
+          "status": "Pending",
+          "timestamp": "2026-07-14T11:55:49.797Z",
+          "title": "Order Placed",
+          "description": "Order placed via simulated active live stream."
+        }
+      ],
+      "orderType": "Delivery"
+    },
+    {
+      "id": "order-804",
+      "customerId": "cust-2",
+      "customerName": "Diana Prince",
+      "customerPhone": "+1 555-3121",
+      "outletId": "out-4",
+      "outletName": "North Suburbs Delivery Kitchen",
+      "items": [
+        {
+          "productId": "prod-3",
+          "name": "Avocado Toast with Poached Egg",
+          "quantity": 1,
+          "price": 9.5,
+          "isVeg": true
+        }
+      ],
+      "subtotal": 9.5,
+      "tax": 0.48,
+      "deliveryCharge": 2.99,
+      "packagingCharge": 1.5,
+      "discount": 0.0,
+      "total": 14.47,
+      "status": "Pending",
+      "paymentStatus": "Paid",
+      "paymentMethod": "UPI",
+      "createdAt": "2026-07-14T11:55:01.804Z",
+      "address": "124 Simulated Lane, New York, NY",
+      "timeline": [
+        {
+          "status": "Pending",
+          "timestamp": "2026-07-14T11:55:01.804Z",
+          "title": "Order Placed",
+          "description": "Order placed via simulated active live stream."
+        }
+      ],
+      "orderType": "Delivery"
+    },
+    {
       "id": "order-101",
       "customerId": "cust-1",
       "customerName": "Marcus Aurelius",
@@ -610,6 +721,26 @@
     }
   ],
   "auditLogs": [
+    {
+      "id": "log-1784030085482",
+      "timestamp": "2026-07-14T17:24:45.482079",
+      "username": "admin@delivo.com",
+      "role": "Admin",
+      "action": "2FA Verification Successful",
+      "module": "Auth",
+      "ipAddress": "127.0.0.1",
+      "browser": "Chrome 126.0 (Windows)"
+    },
+    {
+      "id": "log-1784030081172",
+      "timestamp": "2026-07-14T17:24:41.172982",
+      "username": "admin@delivo.com",
+      "role": "Admin",
+      "action": "Attempt Login",
+      "module": "Auth",
+      "ipAddress": "127.0.0.1",
+      "browser": "Chrome 126.0 (Windows)"
+    },
     {
       "id": "log-1783939089682",
       "timestamp": "2026-07-13T10:38:09.682Z",

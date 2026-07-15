@@ -6,7 +6,7 @@ import {
   LayoutDashboard, ShoppingBag, Utensils, ClipboardList, Package, Users, 
   Bike, Store, Percent, Gift, CreditCard, Wallet, Star, AlertTriangle, 
   FileText, BarChart3, Bell, Image, FileSignature, ShieldAlert, History, 
-  Settings, Key, Database, LogOut, ChevronLeft
+  Settings, Key, Database, LogOut, ChevronLeft, Sliders, ClipboardCheck
 } from 'lucide-react';
 import { RootState, logout } from '../store';
 
@@ -50,10 +50,12 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onToggleSidebar }) => {
     { text: 'Reviews & Feedback', icon: Star, path: '/reviews-complaints', module: 'Reviews', badge: openTicketsCount > 0 ? openTicketsCount : undefined, badgeColor: 'warning' },
     { text: 'Reports & Analytics', icon: BarChart3, path: '/reports-analytics', module: 'Reports' },
     { text: 'Banner & CMS', icon: Image, path: '/banner-cms', module: 'Banner Management' },
+    { text: 'Confirmation Desk', icon: ClipboardCheck, path: '/confirmation-center', module: 'Orders' },
     { text: 'User Management', icon: Users, path: '/user-management', module: 'User Management' },
     { text: 'Role & Permissions', icon: ShieldAlert, path: '/role-permissions', module: 'Role & Permissions' },
     { text: 'Audit Logs', icon: History, path: '/audit-logs', module: 'Audit Logs' },
-    { text: 'Settings & APIs', icon: Settings, path: '/settings', module: 'Settings' }
+    { text: 'Settings & APIs', icon: Settings, path: '/settings', module: 'Settings' },
+    { text: 'Communication Config', icon: Sliders, path: '/settings/communication', module: 'Settings' }
   ];
 
   // Helper to filter menu based on role permissions

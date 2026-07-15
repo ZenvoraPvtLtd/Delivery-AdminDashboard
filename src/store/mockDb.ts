@@ -83,6 +83,16 @@ export interface Order {
   address: string;
   timeline: OrderTimeline[];
   orderType: 'Delivery' | 'Takeaway';
+  
+  // Confirmation System fields
+  confirmation_status?: 'Pending' | 'Confirmed' | 'Cancelled' | 'Expired' | null;
+  confirmation_source?: 'whatsapp' | 'sms' | 'admin' | null;
+  confirmation_requested_at?: string | null;
+  confirmed_at?: string | null;
+  cancelled_at?: string | null;
+  confirmation_token?: string | null;
+  confirmation_expiry?: string | null;
+  customer_reply?: string | null;
 }
 
 export interface Coupon {
@@ -346,3 +356,54 @@ export const initialCustomers = [
   { id: 'cust-4', name: 'Peter Parker', phone: '+1 555-6743', email: 'peter@dailybugle.com', walletBalance: 8.50, rewardPoints: 120, status: 'Active', addresses: ['Apt 2, 20 Ingram St, Queens, NY'], favoriteItems: ['Crispy Buffalo Chicken Wings (8pcs)'] },
   { id: 'cust-5', name: 'Tony Stark', phone: '+1 555-3000', email: 'tony@stark.com', walletBalance: 450.00, rewardPoints: 12000, status: 'Blocked', addresses: ['10880 Malibu Point, CA'], favoriteItems: ['Truffle Mushroom Burger'] }
 ];
+
+export interface NotificationLog {
+  id: string;
+  order_id: string;
+  provider: 'whatsapp' | 'sms';
+  type: 'confirmation' | 'cancellation' | 'success' | 'reminder';
+  status: 'sent' | 'delivered' | 'read' | 'failed';
+  message: string;
+  sent_at: string;
+  delivered_at?: string | null;
+  read_at?: string | null;
+  reply_at?: string | null;
+  retry_count: number;
+  provider_response?: string | null;
+  created_at: string;
+}
+
+export interface ConversationLog {
+  id: string;
+  order_id: string;
+  customer_number: string;
+  message: string;
+  direction: 'incoming' | 'outgoing';
+  provider: 'whatsapp' | 'sms';
+  timestamp: string;
+}
+
+export interface CommunicationSettings {
+  enableWhatsapp: boolean;
+  enableSms: boolean;
+  defaultProvider: string;
+  whatsappProvider: string;
+  smsProvider: string;
+  apiKeys: {
+    metaToken: string;
+    twilioSid: string;
+    twilioAuthToken: string;
+    msg91Key: string;
+    textlocalKey: string;
+    fast2smsKey: string;
+  };
+  webhookSecret: string;
+  retryCount: number;
+  confirmationExpiry: number; // hours
+  templates: {
+    confirmation: string;
+    cancellation: string;
+    success: string;
+    reminder: string;
+  };
+}
