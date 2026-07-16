@@ -962,6 +962,26 @@
   ],
   "auditLogs": [
     {
+      "id": "log-1784203705847",
+      "timestamp": "2026-07-16T12:08:25.848Z",
+      "username": "admin@delivo.com",
+      "role": "Admin",
+      "action": "2FA Verification Successful",
+      "module": "Auth",
+      "ipAddress": "127.0.0.1",
+      "browser": "Chrome 126.0 (Windows)"
+    },
+    {
+      "id": "log-1784203700990",
+      "timestamp": "2026-07-16T12:08:20.990Z",
+      "username": "admin@delivo.com",
+      "role": "Admin",
+      "action": "Attempt Login",
+      "module": "Auth",
+      "ipAddress": "127.0.0.1",
+      "browser": "Chrome 126.0 (Windows)"
+    },
+    {
       "id": "log-1784202509138",
       "timestamp": "2026-07-16T11:48:29.138Z",
       "username": "admin@delivo.com",

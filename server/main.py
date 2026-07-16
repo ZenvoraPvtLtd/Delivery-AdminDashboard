@@ -213,7 +213,20 @@ active_simulations = {}
 async def run_order_simulation(order_id: str):
     print(f"[Simulation] Starting workflow for order: {order_id}")
     statuses = ['Pending', 'Accepted', 'Preparing', 'Ready', 'Picked Up', 'Out for Delivery', 'Delivered']
-    current_status_index = 0
+    
+    db = load_db()
+    order = next((o for o in db.get("orders", []) if o["id"] == order_id), None)
+    if not order:
+        return
+        
+    if order["status"] in ['Cancelled', 'Delivered']:
+        print(f"[Simulation] Order {order_id} is already in state: {order['status']}. Skipping simulation.")
+        return
+        
+    try:
+        current_status_index = statuses.index(order["status"])
+    except ValueError:
+        current_status_index = 0
 
     route_points = []
     start_lat = 40.7128
@@ -238,27 +251,37 @@ async def run_order_simulation(order_id: str):
         if not order:
             print(f"[Simulation] Order {order_id} not found, simulation aborted.")
             break
+            
+        if order["status"] == 'Cancelled':
+            print(f"[Simulation] Order {order_id} has been Cancelled. Simulation aborted.")
+            break
 
-        if order["status"] != statuses[current_status_index]:
-            next_status = statuses[current_status_index]
-            order["status"] = next_status
-            order["timeline"].append({
-                "status": next_status,
-                "timestamp": datetime.now().isoformat(),
-                "title": f"Order is {next_status}",
-                "description": get_status_description(next_status)
-            })
+        # Move to next status if we are not at the end
+        if current_status_index < len(statuses) - 1:
+            # If current status is not "Out for Delivery" or if it is and we finished routing
+            if statuses[current_status_index] != 'Out for Delivery' or route_index >= len(route_points):
+                current_status_index += 1
+                next_status = statuses[current_status_index]
+                order["status"] = next_status
+                order["timeline"].append({
+                    "status": next_status,
+                    "timestamp": datetime.now().isoformat(),
+                    "title": f"Order is {next_status}",
+                    "description": get_status_description(next_status)
+                })
 
-            if next_status == 'Delivered':
-                order["paymentStatus"] = 'Paid'
+                if next_status == 'Delivered':
+                    order["paymentStatus"] = 'Paid'
+                    save_db(db)
+                    await sio.emit('order_status', { "status": 'Delivered', "timeline": order["timeline"] }, room=order_id)
+                    await sio.emit('order_confirmation_updated', order)
+                    print(f"[Simulation] Order {order_id} delivered, simulation stopped.")
+                    break
+
                 save_db(db)
-                await sio.emit('order_status', { "status": 'Delivered', "timeline": order["timeline"] }, room=order_id)
-                print(f"[Simulation] Order {order_id} delivered, simulation stopped.")
-                break
-
-            save_db(db)
-            await sio.emit('order_status', { "status": next_status, "timeline": order["timeline"] }, room=order_id)
-            print(f"[Simulation] Order {order_id} transitioned to: {next_status}")
+                await sio.emit('order_status', { "status": next_status, "timeline": order["timeline"] }, room=order_id)
+                await sio.emit('order_confirmation_updated', order)
+                print(f"[Simulation] Order {order_id} transitioned to: {next_status}")
 
         if order["status"] == 'Out for Delivery':
             if route_index < len(route_points):
@@ -276,10 +299,6 @@ async def run_order_simulation(order_id: str):
                     "riderAvatar": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100"
                 }, room=order_id)
                 route_index += 1
-            else:
-                current_status_index += 1
-        else:
-            current_status_index += 1
 
 def start_order_simulation(order_id: str):
     if order_id in active_simulations:
