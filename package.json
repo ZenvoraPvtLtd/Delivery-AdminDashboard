@@ -5,9 +5,9 @@
   "type": "module",
   "scripts": {
     "start": "node server/start-all.js",
-    "dev": "vite",
-    "serve": "npm run server",
-    "server": "node server/index.js",
+    "dev": "vite --host 127.0.0.1",
+    "serve": "node server/start-python.js",
+    "server": "node server/start-python.js",
     "build": "tsc && vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"

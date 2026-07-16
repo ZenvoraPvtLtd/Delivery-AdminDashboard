@@ -235,6 +235,190 @@
   ],
   "orders": [
     {
+      "id": "order-694",
+      "createdAt": "2026-07-16T11:12:51.694Z",
+      "status": "Delivered",
+      "timeline": [
+        {
+          "status": "Pending",
+          "timestamp": "2026-07-16T11:12:51.694Z",
+          "title": "Order Placed",
+          "description": "Order placed via simulated active live stream."
+        },
+        {
+          "status": "Pending Confirmation",
+          "timestamp": "2026-07-16T11:12:51.709Z",
+          "title": "Confirmation Workflow Triggered",
+          "description": "System is initiating multi-channel dispatch."
+        },
+        {
+          "status": "WhatsApp Sent",
+          "timestamp": "2026-07-16T11:12:52.532Z",
+          "title": "WhatsApp Confirmation Sent",
+          "description": "Message delivered successfully to customer's WhatsApp."
+        },
+        {
+          "status": "Preparing",
+          "timestamp": "2026-07-16T11:13:29.233Z",
+          "title": "Status Updated to Preparing",
+          "description": "Order status set by Super Admin Demo."
+        },
+        {
+          "status": "Confirmed",
+          "timestamp": "2026-07-16T11:16:19.951Z",
+          "title": "Order Confirmed via WhatsApp",
+          "description": "Customer replied: \"YES\"."
+        },
+        {
+          "status": "WhatsApp Sent",
+          "timestamp": "2026-07-16T11:16:20.896Z",
+          "title": "WhatsApp Confirmation Sent",
+          "description": "Message delivered successfully to customer's WhatsApp."
+        },
+        {
+          "status": "Pending",
+          "timestamp": "2026-07-16T11:16:23.962Z",
+          "title": "Order is Pending",
+          "description": "Awaiting restaurant approval."
+        },
+        {
+          "status": "Accepted",
+          "timestamp": "2026-07-16T11:16:27.967Z",
+          "title": "Order is Accepted",
+          "description": "Restaurant accepted your order."
+        },
+        {
+          "status": "Preparing",
+          "timestamp": "2026-07-16T11:16:31.973Z",
+          "title": "Order is Preparing",
+          "description": "Our chef is preparing your meal."
+        },
+        {
+          "status": "Ready",
+          "timestamp": "2026-07-16T11:16:35.978Z",
+          "title": "Order is Ready",
+          "description": "Order packed and ready for delivery partner pickup."
+        },
+        {
+          "status": "Picked Up",
+          "timestamp": "2026-07-16T11:16:39.994Z",
+          "title": "Order is Picked Up",
+          "description": "Delivery partner picked up your package."
+        },
+        {
+          "status": "Out for Delivery",
+          "timestamp": "2026-07-16T11:16:43.995Z",
+          "title": "Order is Out for Delivery",
+          "description": "Rider is on the way to your address."
+        },
+        {
+          "status": "Delivered",
+          "timestamp": "2026-07-16T11:17:40.082Z",
+          "title": "Order is Delivered",
+          "description": "Your order has been delivered. Enjoy your meal!"
+        }
+      ],
+      "customerId": "cust-1",
+      "customerName": "Clark Kent",
+      "customerPhone": "+1 555-8874",
+      "outletId": "out-2",
+      "outletName": "West End Cafe",
+      "items": [
+        {
+          "productId": "prod-3",
+          "name": "Avocado Toast with Poached Egg",
+          "quantity": 1,
+          "price": 9.5,
+          "isVeg": true
+        }
+      ],
+      "subtotal": 9.5,
+      "tax": 0.48,
+      "deliveryCharge": 2.99,
+      "packagingCharge": 1.5,
+      "discount": 0,
+      "total": 14.47,
+      "paymentStatus": "Paid",
+      "paymentMethod": "UPI",
+      "address": "124 Simulated Lane, New York, NY",
+      "orderType": "Delivery",
+      "confirmation_status": "Confirmed",
+      "confirmation_source": "whatsapp",
+      "confirmation_requested_at": "2026-07-16T11:12:51.709Z",
+      "confirmation_token": "token_d60iz7j86",
+      "confirmation_expiry": "2026-07-17T11:12:51.709Z",
+      "customer_reply": "YES",
+      "confirmed_at": "2026-07-16T11:16:19.951Z"
+    },
+    {
+      "id": "order-866",
+      "createdAt": "2026-07-16T11:12:01.866Z",
+      "status": "Cancelled",
+      "timeline": [
+        {
+          "status": "Pending",
+          "timestamp": "2026-07-16T11:12:01.866Z",
+          "title": "Order Placed",
+          "description": "Order placed via simulated active live stream."
+        },
+        {
+          "status": "Pending Confirmation",
+          "timestamp": "2026-07-16T11:12:01.877Z",
+          "title": "Confirmation Workflow Triggered",
+          "description": "System is initiating multi-channel dispatch."
+        },
+        {
+          "status": "WhatsApp Sent",
+          "timestamp": "2026-07-16T11:12:02.751Z",
+          "title": "WhatsApp Confirmation Sent",
+          "description": "Message delivered successfully to customer's WhatsApp."
+        },
+        {
+          "status": "Cancelled",
+          "timestamp": "2026-07-16T11:18:37.422Z",
+          "title": "Order Cancelled via WhatsApp",
+          "description": "Customer replied: \"NO\"."
+        },
+        {
+          "status": "WhatsApp Sent",
+          "timestamp": "2026-07-16T11:18:38.360Z",
+          "title": "WhatsApp Confirmation Sent",
+          "description": "Message delivered successfully to customer's WhatsApp."
+        }
+      ],
+      "customerId": "cust-3",
+      "customerName": "Diana Prince",
+      "customerPhone": "+1 555-6506",
+      "outletId": "out-1",
+      "outletName": "Downtown Central Outlet",
+      "items": [
+        {
+          "productId": "prod-2",
+          "name": "Spicy Pepperoni Pizza (12\")",
+          "quantity": 1,
+          "price": 16.99,
+          "isVeg": false
+        }
+      ],
+      "subtotal": 16.99,
+      "tax": 2.04,
+      "deliveryCharge": 2.99,
+      "packagingCharge": 1.5,
+      "discount": 0,
+      "total": 23.52,
+      "paymentStatus": "Paid",
+      "paymentMethod": "UPI",
+      "address": "124 Simulated Lane, New York, NY",
+      "orderType": "Delivery",
+      "confirmation_status": "Cancelled",
+      "confirmation_source": "whatsapp",
+      "confirmation_requested_at": "2026-07-16T11:12:01.877Z",
+      "confirmation_token": "token_ltir6rema",
+      "confirmation_expiry": "2026-07-17T11:12:01.877Z",
+      "customer_reply": "NO",
+      "cancelled_at": "2026-07-16T11:18:37.422Z"
+    },
+    {
       "id": "order-782",
       "customerId": "cust-4",
       "customerName": "Bruce Banner",
@@ -254,7 +438,7 @@
       "tax": 2.16,
       "deliveryCharge": 2.99,
       "packagingCharge": 1.5,
-      "discount": 0.0,
+      "discount": 0,
       "total": 18.64,
       "status": "Pending",
       "paymentStatus": "Paid",
@@ -269,7 +453,15 @@
           "description": "Order placed via simulated active live stream."
         }
       ],
-      "orderType": "Delivery"
+      "orderType": "Delivery",
+      "confirmation_status": null,
+      "confirmation_source": null,
+      "confirmation_requested_at": null,
+      "confirmed_at": null,
+      "cancelled_at": null,
+      "confirmation_token": null,
+      "confirmation_expiry": null,
+      "customer_reply": null
     },
     {
       "id": "order-797",
@@ -291,7 +483,7 @@
       "tax": 0.55,
       "deliveryCharge": 2.99,
       "packagingCharge": 1.5,
-      "discount": 0.0,
+      "discount": 0,
       "total": 16.03,
       "status": "Pending",
       "paymentStatus": "Paid",
@@ -306,7 +498,15 @@
           "description": "Order placed via simulated active live stream."
         }
       ],
-      "orderType": "Delivery"
+      "orderType": "Delivery",
+      "confirmation_status": null,
+      "confirmation_source": null,
+      "confirmation_requested_at": null,
+      "confirmed_at": null,
+      "cancelled_at": null,
+      "confirmation_token": null,
+      "confirmation_expiry": null,
+      "customer_reply": null
     },
     {
       "id": "order-804",
@@ -328,7 +528,7 @@
       "tax": 0.48,
       "deliveryCharge": 2.99,
       "packagingCharge": 1.5,
-      "discount": 0.0,
+      "discount": 0,
       "total": 14.47,
       "status": "Pending",
       "paymentStatus": "Paid",
@@ -343,7 +543,15 @@
           "description": "Order placed via simulated active live stream."
         }
       ],
-      "orderType": "Delivery"
+      "orderType": "Delivery",
+      "confirmation_status": null,
+      "confirmation_source": null,
+      "confirmation_requested_at": null,
+      "confirmed_at": null,
+      "cancelled_at": null,
+      "confirmation_token": null,
+      "confirmation_expiry": null,
+      "customer_reply": null
     },
     {
       "id": "order-101",
@@ -400,7 +608,15 @@
           "title": "Kitchen Accepted",
           "description": "Chef Sarah started preparing the items."
         }
-      ]
+      ],
+      "confirmation_status": null,
+      "confirmation_source": null,
+      "confirmation_requested_at": null,
+      "confirmed_at": null,
+      "cancelled_at": null,
+      "confirmation_token": null,
+      "confirmation_expiry": null,
+      "customer_reply": null
     },
     {
       "id": "order-102",
@@ -462,7 +678,15 @@
           "title": "Handed Over to Rider",
           "description": "Rider Alex Mercer is transit with order."
         }
-      ]
+      ],
+      "confirmation_status": null,
+      "confirmation_source": null,
+      "confirmation_requested_at": null,
+      "confirmed_at": null,
+      "cancelled_at": null,
+      "confirmation_token": null,
+      "confirmation_expiry": null,
+      "customer_reply": null
     },
     {
       "id": "order-103",
@@ -506,7 +730,15 @@
           "title": "Order Received",
           "description": "Awaiting confirmation and cash check."
         }
-      ]
+      ],
+      "confirmation_status": null,
+      "confirmation_source": null,
+      "confirmation_requested_at": null,
+      "confirmed_at": null,
+      "cancelled_at": null,
+      "confirmation_token": null,
+      "confirmation_expiry": null,
+      "customer_reply": null
     },
     {
       "id": "order-104",
@@ -569,7 +801,15 @@
           "title": "Delivered",
           "description": "Order hand-delivered by Maria Gonzalez."
         }
-      ]
+      ],
+      "confirmation_status": null,
+      "confirmation_source": null,
+      "confirmation_requested_at": null,
+      "confirmed_at": null,
+      "cancelled_at": null,
+      "confirmation_token": null,
+      "confirmation_expiry": null,
+      "customer_reply": null
     }
   ],
   "coupons": [
@@ -721,6 +961,76 @@
     }
   ],
   "auditLogs": [
+    {
+      "id": "log-1784200444759",
+      "timestamp": "2026-07-16T11:14:04.759Z",
+      "username": "superadmin@delivo.com",
+      "role": "Super Admin",
+      "action": "2FA Verification Successful",
+      "module": "Auth",
+      "ipAddress": "127.0.0.1",
+      "browser": "Chrome 126.0 (Windows)"
+    },
+    {
+      "id": "log-1784200428362",
+      "timestamp": "2026-07-16T11:13:48.362Z",
+      "username": "superadmin@delivo.com",
+      "role": "Super Admin",
+      "action": "Quick Login Selected",
+      "module": "Auth",
+      "ipAddress": "127.0.0.1",
+      "browser": "Chrome 126.0 (Windows)"
+    },
+    {
+      "id": "log-1784200409245",
+      "timestamp": "2026-07-16T11:13:29.245Z",
+      "username": "superadmin@delivo.com",
+      "role": "Super Admin",
+      "action": "Moved order order-694 to status Preparing",
+      "module": "Orders",
+      "ipAddress": "127.0.0.1",
+      "browser": "Admin Console"
+    },
+    {
+      "id": "log-1784200363187",
+      "timestamp": "2026-07-16T11:12:43.187Z",
+      "username": "superadmin@delivo.com",
+      "role": "Super Admin",
+      "action": "2FA Verification Successful",
+      "module": "Auth",
+      "ipAddress": "127.0.0.1",
+      "browser": "Chrome 126.0 (Windows)"
+    },
+    {
+      "id": "log-1784200342087",
+      "timestamp": "2026-07-16T11:12:22.087Z",
+      "username": "superadmin@delivo.com",
+      "role": "Super Admin",
+      "action": "Quick Login Selected",
+      "module": "Auth",
+      "ipAddress": "127.0.0.1",
+      "browser": "Chrome 126.0 (Windows)"
+    },
+    {
+      "id": "log-1784200305197",
+      "timestamp": "2026-07-16T11:11:45.197Z",
+      "username": "superadmin@delivo.com",
+      "role": "Super Admin",
+      "action": "2FA Verification Successful",
+      "module": "Auth",
+      "ipAddress": "127.0.0.1",
+      "browser": "Chrome 126.0 (Windows)"
+    },
+    {
+      "id": "log-1784200280094",
+      "timestamp": "2026-07-16T11:11:20.094Z",
+      "username": "superadmin@delivo.com",
+      "role": "Super Admin",
+      "action": "Quick Login Selected",
+      "module": "Auth",
+      "ipAddress": "127.0.0.1",
+      "browser": "Chrome 126.0 (Windows)"
+    },
     {
       "id": "log-1784030085482",
       "timestamp": "2026-07-14T17:24:45.482079",
@@ -889,7 +1199,7 @@
       "phone": "+1 555-8921",
       "email": "marcus@philosophy.com",
       "walletBalance": 42.5,
-      "rewardPoints": 1200,
+      "rewardPoints": 1210,
       "status": "Active",
       "addresses": [
         "Apt 4B, 32 Wall Street, Financial District, NY"
@@ -919,7 +1229,7 @@
       "phone": "+1 555-7700",
       "email": "bruce@waynecorp.com",
       "walletBalance": 9800,
-      "rewardPoints": 95000,
+      "rewardPoints": 95017,
       "status": "Active",
       "addresses": [
         "Penthouse A, Wayne Tower, Manhattan, NY",
@@ -985,5 +1295,147 @@
       "type": "Popup",
       "schedule": "Daily 4 PM - 7 PM"
     }
-  ]
+  ],
+  "notifications": [
+    {
+      "id": "notif-1784200321907-882",
+      "order_id": "order-866",
+      "provider": "meta",
+      "type": "confirmation",
+      "status": "delivered",
+      "message": "Hello Diana Prince,\n\nThank you for choosing Delivo Cafe ❤️\n\nYour Order Details\nOrder ID: 866\nItems: 1x Spicy Pepperoni Pizza (12\")\nTotal Amount: ₹23.52\nDelivery Address: 124 Simulated Lane, New York, NY\n\nPlease confirm your order.\n\nReply YES to Confirm\nReply NO to Cancel\n\nThank You.",
+      "sent_at": "2026-07-16T11:12:01.908Z",
+      "delivered_at": "2026-07-16T11:12:02.745Z",
+      "read_at": "2026-07-16T11:12:04.246Z",
+      "reply_at": null,
+      "retry_count": 0,
+      "provider_response": "OK: Message Queued & Delivered",
+      "created_at": "2026-07-16T11:12:01.908Z"
+    },
+    {
+      "id": "notif-1784200371713-923",
+      "order_id": "order-694",
+      "provider": "meta",
+      "type": "confirmation",
+      "status": "delivered",
+      "message": "Hello Clark Kent,\n\nThank you for choosing Delivo Cafe ❤️\n\nYour Order Details\nOrder ID: 694\nItems: 1x Avocado Toast with Poached Egg\nTotal Amount: ₹14.47\nDelivery Address: 124 Simulated Lane, New York, NY\n\nPlease confirm your order.\n\nReply YES to Confirm\nReply NO to Cancel\n\nThank You.",
+      "sent_at": "2026-07-16T11:12:51.713Z",
+      "delivered_at": "2026-07-16T11:12:52.522Z",
+      "read_at": "2026-07-16T11:12:54.022Z",
+      "reply_at": null,
+      "retry_count": 0,
+      "provider_response": "OK: Message Queued & Delivered",
+      "created_at": "2026-07-16T11:12:51.713Z"
+    },
+    {
+      "id": "notif-1784200580068-784",
+      "order_id": "order-694",
+      "provider": "meta",
+      "type": "success",
+      "status": "delivered",
+      "message": "Thank You.\n\nYour order has been confirmed successfully.\nOrder ID: 694\n\nWe have started processing your order.",
+      "sent_at": "2026-07-16T11:16:20.068Z",
+      "delivered_at": "2026-07-16T11:16:20.884Z",
+      "read_at": "2026-07-16T11:16:22.385Z",
+      "reply_at": null,
+      "retry_count": 0,
+      "provider_response": "OK: Message Queued & Delivered",
+      "created_at": "2026-07-16T11:16:20.068Z"
+    },
+    {
+      "id": "notif-1784200717536-286",
+      "order_id": "order-866",
+      "provider": "meta",
+      "type": "cancellation",
+      "status": "delivered",
+      "message": "Your order has been cancelled successfully.\n\nIf this was a mistake, please contact support at +1 555-0100.",
+      "sent_at": "2026-07-16T11:18:37.536Z",
+      "delivered_at": "2026-07-16T11:18:38.352Z",
+      "read_at": "2026-07-16T11:18:39.853Z",
+      "reply_at": null,
+      "retry_count": 0,
+      "provider_response": "OK: Message Queued & Delivered",
+      "created_at": "2026-07-16T11:18:37.536Z"
+    }
+  ],
+  "conversations": [
+    {
+      "id": "conv-1784200322749-761",
+      "order_id": "order-866",
+      "customer_number": "+1 555-6506",
+      "message": "Hello Diana Prince,\n\nThank you for choosing Delivo Cafe ❤️\n\nYour Order Details\nOrder ID: 866\nItems: 1x Spicy Pepperoni Pizza (12\")\nTotal Amount: ₹23.52\nDelivery Address: 124 Simulated Lane, New York, NY\n\nPlease confirm your order.\n\nReply YES to Confirm\nReply NO to Cancel\n\nThank You.",
+      "direction": "outgoing",
+      "provider": "whatsapp",
+      "timestamp": "2026-07-16T11:12:02.749Z"
+    },
+    {
+      "id": "conv-1784200372526-899",
+      "order_id": "order-694",
+      "customer_number": "+1 555-8874",
+      "message": "Hello Clark Kent,\n\nThank you for choosing Delivo Cafe ❤️\n\nYour Order Details\nOrder ID: 694\nItems: 1x Avocado Toast with Poached Egg\nTotal Amount: ₹14.47\nDelivery Address: 124 Simulated Lane, New York, NY\n\nPlease confirm your order.\n\nReply YES to Confirm\nReply NO to Cancel\n\nThank You.",
+      "direction": "outgoing",
+      "provider": "whatsapp",
+      "timestamp": "2026-07-16T11:12:52.526Z"
+    },
+    {
+      "id": "conv-1784200579950",
+      "order_id": "order-694",
+      "customer_number": "+1 555-8874",
+      "message": "YES",
+      "direction": "incoming",
+      "provider": "whatsapp",
+      "timestamp": "2026-07-16T11:16:19.950Z"
+    },
+    {
+      "id": "conv-1784200580893-117",
+      "order_id": "order-694",
+      "customer_number": "+1 555-8874",
+      "message": "Thank You.\n\nYour order has been confirmed successfully.\nOrder ID: 694\n\nWe have started processing your order.",
+      "direction": "outgoing",
+      "provider": "whatsapp",
+      "timestamp": "2026-07-16T11:16:20.894Z"
+    },
+    {
+      "id": "conv-1784200717421",
+      "order_id": "order-866",
+      "customer_number": "+1 555-6506",
+      "message": "NO",
+      "direction": "incoming",
+      "provider": "whatsapp",
+      "timestamp": "2026-07-16T11:18:37.422Z"
+    },
+    {
+      "id": "conv-1784200718357-780",
+      "order_id": "order-866",
+      "customer_number": "+1 555-6506",
+      "message": "Your order has been cancelled successfully.\n\nIf this was a mistake, please contact support at +1 555-0100.",
+      "direction": "outgoing",
+      "provider": "whatsapp",
+      "timestamp": "2026-07-16T11:18:38.357Z"
+    }
+  ],
+  "communicationSettings": {
+    "enableWhatsapp": true,
+    "enableSms": true,
+    "defaultProvider": "meta",
+    "whatsappProvider": "meta",
+    "smsProvider": "twilio",
+    "apiKeys": {
+      "metaToken": "mock-meta-token-xyz-98765",
+      "twilioSid": "mock-twilio-sid-12345",
+      "twilioAuthToken": "mock-twilio-auth-token-67890",
+      "msg91Key": "mock-msg91-key-abcde",
+      "textlocalKey": "mock-textlocal-key-fghij",
+      "fast2smsKey": "mock-fast2sms-key-klmno"
+    },
+    "webhookSecret": "whsec_ZenvoraSecretToken2026",
+    "retryCount": 3,
+    "confirmationExpiry": 24,
+    "templates": {
+      "confirmation": "Hello {{CustomerName}},\n\nThank you for choosing {{CompanyName}} ❤️\n\nYour Order Details\nOrder ID: {{OrderID}}\nItems: {{Items}}\nTotal Amount: ₹{{Amount}}\nDelivery Address: {{Address}}\n\nPlease confirm your order.\n\nReply YES to Confirm\nReply NO to Cancel\n\nThank You.",
+      "cancellation": "Your order has been cancelled successfully.\n\nIf this was a mistake, please contact support at {{SupportNumber}}.",
+      "success": "Thank You.\n\nYour order has been confirmed successfully.\nOrder ID: {{OrderID}}\n\nWe have started processing your order.",
+      "reminder": "Gentle Reminder ⏰\n\nYour Order {{OrderID}} is waiting for confirmation.\n\nReply YES to Confirm\nReply NO to Cancel."
+    }
+  }
 }
