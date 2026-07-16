@@ -321,34 +321,107 @@ const OrderConfirmationCenter: React.FC = () => {
   return (
     <Box>
       {/* Upper Panel Controls */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', md: 'center' }, gap: 2, mb: 3.5 }}>
         <Box>
-          <Typography variant="h4" sx={{ fontFamily: 'Outfit', fontWeight: 800 }}>
-            Order Confirmation Desk
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Typography variant="h4" sx={{ fontFamily: 'Outfit', fontWeight: 800, letterSpacing: '-0.5px' }}>
+              Order Confirmation Desk
+            </Typography>
+            <Box sx={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: 1, 
+              px: 1.5, 
+              py: 0.5, 
+              borderRadius: '20px', 
+              bgcolor: 'rgba(16, 185, 129, 0.1)', 
+              border: '1px solid rgba(16, 185, 129, 0.2)' 
+            }}>
+              <Box className="pulse-dot" sx={{ 
+                width: 7, 
+                height: 7, 
+                borderRadius: '50%', 
+                bgcolor: 'success.main',
+                animation: 'pulse 1.8s infinite ease-in-out',
+                '@keyframes pulse': {
+                  '0%': { transform: 'scale(0.95)', boxShadow: '0 0 0 0 rgba(16, 185, 129, 0.7)' },
+                  '70%': { transform: 'scale(1)', boxShadow: '0 0 0 6px rgba(16, 185, 129, 0)' },
+                  '100%': { transform: 'scale(0.95)', boxShadow: '0 0 0 0 rgba(16, 185, 129, 0)' }
+                }
+              }} />
+              <Typography variant="caption" sx={{ color: 'success.main', fontWeight: 700, letterSpacing: '0.5px', textTransform: 'uppercase', fontSize: '0.625rem' }}>
+                Live Monitor Active
+              </Typography>
+            </Box>
+          </Box>
           <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
             Automated customer approvals, failover logs, timelines, and gateway traffic controls
           </Typography>
         </Box>
-        <Box sx={{ display: 'flex', gap: 1.5 }}>
-          <Button variant="outlined" startIcon={<RefreshCw size={16} />} onClick={loadData} sx={{ borderRadius: 2 }}>
+        <Box sx={{ display: 'flex', gap: 1.5, alignSelf: { xs: 'stretch', md: 'auto' } }}>
+          <Button 
+            variant="outlined" 
+            startIcon={<RefreshCw size={15} />} 
+            onClick={loadData} 
+            sx={{ 
+              borderRadius: 2.5, 
+              px: 2.5,
+              textTransform: 'none',
+              fontWeight: 600,
+              borderColor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)',
+              color: 'text.primary',
+              '&:hover': {
+                bgcolor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
+                borderColor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)'
+              }
+            }}
+          >
             Refresh Desk
           </Button>
-          <Button variant="contained" startIcon={<Download size={16} />} onClick={handleExportCSV} color="primary" sx={{ borderRadius: 2 }}>
+          <Button 
+            variant="contained" 
+            startIcon={<Download size={15} />} 
+            onClick={handleExportCSV} 
+            color="primary" 
+            sx={{ 
+              borderRadius: 2.5, 
+              px: 2.5,
+              textTransform: 'none',
+              fontWeight: 600,
+              boxShadow: 'none',
+              '&:hover': {
+                boxShadow: 'none'
+              }
+            }}
+          >
             Export CSV
           </Button>
         </Box>
       </Box>
 
       {/* KPI Cards Row */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
+      <Grid container spacing={3} sx={{ mb: 4.5 }}>
+        {/* Card 1: Total Handled */}
         <Grid item xs={12} sm={6} md={3} lg={2.4}>
-          <Card sx={{ bgcolor: 'rgba(27,38,59,0.3)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(10px)', borderRadius: 2 }}>
-            <CardContent sx={{ p: 2.5 }}>
-              <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 1, fontWeight: 600 }}>Total Handled Orders</Typography>
+          <Card sx={{ 
+            bgcolor: theme.palette.mode === 'dark' ? 'rgba(30, 41, 59, 0.4)' : '#ffffff', 
+            border: theme.palette.mode === 'dark' ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.08)',
+            borderLeft: '4px solid #FF6B00',
+            boxShadow: theme.palette.mode === 'dark' ? 'none' : '0 4px 20px rgba(0,0,0,0.03)',
+            borderRadius: 3.5,
+            transition: 'transform 0.2s, box-shadow 0.2s',
+            '&:hover': {
+              transform: 'translateY(-2px)',
+              boxShadow: theme.palette.mode === 'dark' ? '0 4px 20px rgba(0,0,0,0.2)' : '0 6px 24px rgba(0,0,0,0.06)'
+            }
+          }}>
+            <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+              <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 1, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', fontSize: '0.68rem' }}>
+                Total Handled
+              </Typography>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Typography variant="h4" sx={{ fontWeight: 800, fontFamily: 'Outfit' }}>{kpiCards.total}</Typography>
-                <Avatar sx={{ bgcolor: 'rgba(255,107,0,0.1)', color: '#FF6B00', width: 40, height: 40 }}>
+                <Avatar sx={{ bgcolor: 'rgba(255,107,0,0.1)', color: '#FF6B00', width: 42, height: 42 }}>
                   <ListTodo size={20} />
                 </Avatar>
               </Box>
@@ -356,13 +429,27 @@ const OrderConfirmationCenter: React.FC = () => {
           </Card>
         </Grid>
         
+        {/* Card 2: Pending Reply */}
         <Grid item xs={12} sm={6} md={3} lg={2.4}>
-          <Card sx={{ bgcolor: 'rgba(27,38,59,0.3)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(10px)', borderRadius: 2 }}>
-            <CardContent sx={{ p: 2.5 }}>
-              <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 1, fontWeight: 600 }}>Pending Reply</Typography>
+          <Card sx={{ 
+            bgcolor: theme.palette.mode === 'dark' ? 'rgba(30, 41, 59, 0.4)' : '#ffffff', 
+            border: theme.palette.mode === 'dark' ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.08)',
+            borderLeft: '4px solid #F59E0B',
+            boxShadow: theme.palette.mode === 'dark' ? 'none' : '0 4px 20px rgba(0,0,0,0.03)',
+            borderRadius: 3.5,
+            transition: 'transform 0.2s, box-shadow 0.2s',
+            '&:hover': {
+              transform: 'translateY(-2px)',
+              boxShadow: theme.palette.mode === 'dark' ? '0 4px 20px rgba(0,0,0,0.2)' : '0 6px 24px rgba(0,0,0,0.06)'
+            }
+          }}>
+            <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+              <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 1, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', fontSize: '0.68rem' }}>
+                Pending Reply
+              </Typography>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Typography variant="h4" sx={{ fontWeight: 800, fontFamily: 'Outfit', color: 'warning.main' }}>{kpiCards.pending}</Typography>
-                <Avatar sx={{ bgcolor: 'rgba(245,158,11,0.1)', color: 'warning.main', width: 40, height: 40 }}>
+                <Avatar sx={{ bgcolor: 'rgba(245,158,11,0.1)', color: 'warning.main', width: 42, height: 42 }}>
                   <Clock size={20} />
                 </Avatar>
               </Box>
@@ -370,13 +457,27 @@ const OrderConfirmationCenter: React.FC = () => {
           </Card>
         </Grid>
 
+        {/* Card 3: Confirmed */}
         <Grid item xs={12} sm={6} md={3} lg={2.4}>
-          <Card sx={{ bgcolor: 'rgba(27,38,59,0.3)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(10px)', borderRadius: 2 }}>
-            <CardContent sx={{ p: 2.5 }}>
-              <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 1, fontWeight: 600 }}>Confirmed Orders</Typography>
+          <Card sx={{ 
+            bgcolor: theme.palette.mode === 'dark' ? 'rgba(30, 41, 59, 0.4)' : '#ffffff', 
+            border: theme.palette.mode === 'dark' ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.08)',
+            borderLeft: '4px solid #10B981',
+            boxShadow: theme.palette.mode === 'dark' ? 'none' : '0 4px 20px rgba(0,0,0,0.03)',
+            borderRadius: 3.5,
+            transition: 'transform 0.2s, box-shadow 0.2s',
+            '&:hover': {
+              transform: 'translateY(-2px)',
+              boxShadow: theme.palette.mode === 'dark' ? '0 4px 20px rgba(0,0,0,0.2)' : '0 6px 24px rgba(0,0,0,0.06)'
+            }
+          }}>
+            <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+              <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 1, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', fontSize: '0.68rem' }}>
+                Confirmed Orders
+              </Typography>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Typography variant="h4" sx={{ fontWeight: 800, fontFamily: 'Outfit', color: 'success.main' }}>{kpiCards.confirmed}</Typography>
-                <Avatar sx={{ bgcolor: 'rgba(16,185,129,0.1)', color: 'success.main', width: 40, height: 40 }}>
+                <Avatar sx={{ bgcolor: 'rgba(16,185,129,0.1)', color: 'success.main', width: 42, height: 42 }}>
                   <CheckCircle size={20} />
                 </Avatar>
               </Box>
@@ -384,13 +485,27 @@ const OrderConfirmationCenter: React.FC = () => {
           </Card>
         </Grid>
 
+        {/* Card 4: Cancelled */}
         <Grid item xs={12} sm={6} md={3} lg={2.4}>
-          <Card sx={{ bgcolor: 'rgba(27,38,59,0.3)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(10px)', borderRadius: 2 }}>
-            <CardContent sx={{ p: 2.5 }}>
-              <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 1, fontWeight: 600 }}>Cancelled Orders</Typography>
+          <Card sx={{ 
+            bgcolor: theme.palette.mode === 'dark' ? 'rgba(30, 41, 59, 0.4)' : '#ffffff', 
+            border: theme.palette.mode === 'dark' ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.08)',
+            borderLeft: '4px solid #EF4444',
+            boxShadow: theme.palette.mode === 'dark' ? 'none' : '0 4px 20px rgba(0,0,0,0.03)',
+            borderRadius: 3.5,
+            transition: 'transform 0.2s, box-shadow 0.2s',
+            '&:hover': {
+              transform: 'translateY(-2px)',
+              boxShadow: theme.palette.mode === 'dark' ? '0 4px 20px rgba(0,0,0,0.2)' : '0 6px 24px rgba(0,0,0,0.06)'
+            }
+          }}>
+            <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+              <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 1, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', fontSize: '0.68rem' }}>
+                Cancelled Orders
+              </Typography>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Typography variant="h4" sx={{ fontWeight: 800, fontFamily: 'Outfit', color: 'error.main' }}>{kpiCards.cancelled}</Typography>
-                <Avatar sx={{ bgcolor: 'rgba(239,68,68,0.1)', color: 'error.main', width: 40, height: 40 }}>
+                <Avatar sx={{ bgcolor: 'rgba(239,68,68,0.1)', color: 'error.main', width: 42, height: 42 }}>
                   <XCircle size={20} />
                 </Avatar>
               </Box>
@@ -398,13 +513,27 @@ const OrderConfirmationCenter: React.FC = () => {
           </Card>
         </Grid>
 
+        {/* Card 5: Confirmation Rate */}
         <Grid item xs={12} sm={6} md={3} lg={2.4}>
-          <Card sx={{ bgcolor: 'rgba(27,38,59,0.3)', border: '1px solid rgba(255,255,255,0.05)', backdropFilter: 'blur(10px)', borderRadius: 2 }}>
-            <CardContent sx={{ p: 2.5 }}>
-              <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 1, fontWeight: 600 }}>Confirmation Rate</Typography>
+          <Card sx={{ 
+            bgcolor: theme.palette.mode === 'dark' ? 'rgba(30, 41, 59, 0.4)' : '#ffffff', 
+            border: theme.palette.mode === 'dark' ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.08)',
+            borderLeft: '4px solid #6366F1',
+            boxShadow: theme.palette.mode === 'dark' ? 'none' : '0 4px 20px rgba(0,0,0,0.03)',
+            borderRadius: 3.5,
+            transition: 'transform 0.2s, box-shadow 0.2s',
+            '&:hover': {
+              transform: 'translateY(-2px)',
+              boxShadow: theme.palette.mode === 'dark' ? '0 4px 20px rgba(0,0,0,0.2)' : '0 6px 24px rgba(0,0,0,0.06)'
+            }
+          }}>
+            <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+              <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 1, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', fontSize: '0.68rem' }}>
+                Confirmation Rate
+              </Typography>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Typography variant="h4" sx={{ fontWeight: 800, fontFamily: 'Outfit', color: 'primary.main' }}>{kpiCards.confirmationRate}%</Typography>
-                <Avatar sx={{ bgcolor: 'rgba(27,67,50,0.1)', color: 'primary.main', width: 40, height: 40 }}>
+                <Avatar sx={{ bgcolor: 'rgba(99,102,241,0.1)', color: '#6366F1', width: 42, height: 42 }}>
                   <ArrowUpRight size={20} />
                 </Avatar>
               </Box>
@@ -414,21 +543,26 @@ const OrderConfirmationCenter: React.FC = () => {
       </Grid>
 
       {/* Tabs Layout */}
-      <Card sx={{ background: 'rgba(18,26,47,0.5)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 3 }}>
+      <Card sx={{ 
+        background: theme.palette.mode === 'dark' ? 'rgba(30, 41, 59, 0.45)' : '#ffffff', 
+        border: theme.palette.mode === 'dark' ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.08)',
+        boxShadow: theme.palette.mode === 'dark' ? 'none' : '0 6px 24px rgba(0,0,0,0.04)',
+        borderRadius: 4 
+      }}>
         <CardContent sx={{ p: 0 }}>
-          <Box sx={{ borderBottom: 1, borderColor: 'divider', px: 3, pt: 1 }}>
+          <Box sx={{ borderBottom: 1, borderColor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)', px: 3, pt: 1.5 }}>
             <Tabs value={activeTab} onChange={(_, nv) => setActiveTab(nv)} textColor="primary" indicatorColor="primary">
-              <Tab label="Approval Desk Console" icon={<ListTodo size={16} />} iconPosition="start" sx={{ py: 2, fontWeight: 600 }} />
-              <Tab label="Analytics Dashboard" icon={<BarChart2 size={16} />} iconPosition="start" sx={{ py: 2, fontWeight: 600 }} />
-              <Tab label="SMS & WhatsApp logs" icon={<Terminal size={16} />} iconPosition="start" sx={{ py: 2, fontWeight: 600 }} />
+              <Tab label="Approval Desk Console" icon={<ListTodo size={16} />} iconPosition="start" sx={{ py: 2, fontWeight: 700, fontSize: '0.85rem', textTransform: 'none' }} />
+              <Tab label="Analytics Dashboard" icon={<BarChart2 size={16} />} iconPosition="start" sx={{ py: 2, fontWeight: 700, fontSize: '0.85rem', textTransform: 'none' }} />
+              <Tab label="SMS & WhatsApp logs" icon={<Terminal size={16} />} iconPosition="start" sx={{ py: 2, fontWeight: 700, fontSize: '0.85rem', textTransform: 'none' }} />
             </Tabs>
           </Box>
 
           {/* Tab 0: Orders Console */}
           {activeTab === 0 && (
-            <Box sx={{ p: 3 }}>
+            <Box sx={{ p: 3.5 }}>
               {/* Filters Panel */}
-              <Grid container spacing={2} sx={{ mb: 3 }} alignItems="center">
+              <Grid container spacing={2.5} sx={{ mb: 4.5 }} alignItems="center">
                 <Grid item xs={12} sm={4} md={3}>
                   <TextField
                     fullWidth
@@ -437,13 +571,18 @@ const OrderConfirmationCenter: React.FC = () => {
                     value={search}
                     onChange={e => setSearch(e.target.value)}
                     InputProps={{
-                      startAdornment: <Search size={16} style={{ marginRight: 8, color: theme.palette.text.secondary }} />
+                      startAdornment: <Search size={15} style={{ marginRight: 8, color: theme.palette.text.secondary }} />
                     }}
-                    sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                    sx={{ 
+                      '& .MuiOutlinedInput-root': { 
+                        borderRadius: 2.5,
+                        bgcolor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.01)'
+                      } 
+                    }}
                   />
                 </Grid>
                 <Grid item xs={6} sm={2.5} md={2}>
-                  <FormControl fullWidth size="small">
+                  <FormControl fullWidth size="small" sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2.5, bgcolor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.01)' } }}>
                     <InputLabel>Status</InputLabel>
                     <Select value={statusFilter} label="Status" onChange={e => setStatusFilter(e.target.value)}>
                       <MenuItem value="All">All Statuses</MenuItem>
@@ -457,7 +596,7 @@ const OrderConfirmationCenter: React.FC = () => {
                   </FormControl>
                 </Grid>
                 <Grid item xs={6} sm={2.5} md={2}>
-                  <FormControl fullWidth size="small">
+                  <FormControl fullWidth size="small" sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2.5, bgcolor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.01)' } }}>
                     <InputLabel>Range</InputLabel>
                     <Select value={dateFilter} label="Range" onChange={e => setDateFilter(e.target.value)}>
                       <MenuItem value="today">Today</MenuItem>
@@ -471,41 +610,41 @@ const OrderConfirmationCenter: React.FC = () => {
                 {dateFilter === 'custom' && (
                   <>
                     <Grid item xs={6} sm={2} md={1.5}>
-                      <TextField fullWidth size="small" type="date" label="Start" InputLabelProps={{ shrink: true }} value={customStartDate} onChange={e => setCustomStartDate(e.target.value)} />
+                      <TextField fullWidth size="small" type="date" label="Start" InputLabelProps={{ shrink: true }} value={customStartDate} onChange={e => setCustomStartDate(e.target.value)} sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2.5 } }} />
                     </Grid>
                     <Grid item xs={6} sm={2} md={1.5}>
-                      <TextField fullWidth size="small" type="date" label="End" InputLabelProps={{ shrink: true }} value={customEndDate} onChange={e => setCustomEndDate(e.target.value)} />
+                      <TextField fullWidth size="small" type="date" label="End" InputLabelProps={{ shrink: true }} value={customEndDate} onChange={e => setCustomEndDate(e.target.value)} sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2.5 } }} />
                     </Grid>
                   </>
                 )}
                 <Grid item xs={12} sm={dateFilter === 'custom' ? 12 : 3} md={dateFilter === 'custom' ? 12 : 5} sx={{ textAlign: 'right' }}>
-                  <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 600 }}>
-                    Found {filteredOrders.length} records
+                  <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 600, fontSize: '0.85rem' }}>
+                    Found <Typography component="span" sx={{ color: 'primary.main', fontWeight: 800 }}>{filteredOrders.length}</Typography> records
                   </Typography>
                 </Grid>
               </Grid>
 
               {/* Data Table */}
-              <TableContainer>
+              <TableContainer sx={{ border: `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`, borderRadius: 3 }}>
                 <Table size="medium">
-                  <TableHead>
+                  <TableHead sx={{ bgcolor: theme.palette.mode === 'dark' ? 'rgba(15, 23, 42, 0.4)' : 'rgba(0,0,0,0.02)' }}>
                     <TableRow>
-                      <TableCell sx={{ fontWeight: 700 }}>Order ID</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }}>Customer Name</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }}>Phone Number</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }}>WhatsApp Status</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }}>SMS Status</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }}>Customer Reply</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }}>Order Status</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }}>Source</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }}>Created Time</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }} align="center">Actions</TableCell>
+                      <TableCell sx={{ fontWeight: 700, textTransform: 'uppercase', fontSize: '0.72rem', letterSpacing: '0.5px', color: 'text.secondary', borderBottom: `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}` }}>Order ID</TableCell>
+                      <TableCell sx={{ fontWeight: 700, textTransform: 'uppercase', fontSize: '0.72rem', letterSpacing: '0.5px', color: 'text.secondary', borderBottom: `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}` }}>Customer Name</TableCell>
+                      <TableCell sx={{ fontWeight: 700, textTransform: 'uppercase', fontSize: '0.72rem', letterSpacing: '0.5px', color: 'text.secondary', borderBottom: `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}` }}>Phone Number</TableCell>
+                      <TableCell sx={{ fontWeight: 700, textTransform: 'uppercase', fontSize: '0.72rem', letterSpacing: '0.5px', color: 'text.secondary', borderBottom: `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}` }}>WhatsApp Status</TableCell>
+                      <TableCell sx={{ fontWeight: 700, textTransform: 'uppercase', fontSize: '0.72rem', letterSpacing: '0.5px', color: 'text.secondary', borderBottom: `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}` }}>SMS Status</TableCell>
+                      <TableCell sx={{ fontWeight: 700, textTransform: 'uppercase', fontSize: '0.72rem', letterSpacing: '0.5px', color: 'text.secondary', borderBottom: `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}` }}>Customer Reply</TableCell>
+                      <TableCell sx={{ fontWeight: 700, textTransform: 'uppercase', fontSize: '0.72rem', letterSpacing: '0.5px', color: 'text.secondary', borderBottom: `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}` }}>Order Status</TableCell>
+                      <TableCell sx={{ fontWeight: 700, textTransform: 'uppercase', fontSize: '0.72rem', letterSpacing: '0.5px', color: 'text.secondary', borderBottom: `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}` }}>Source</TableCell>
+                      <TableCell sx={{ fontWeight: 700, textTransform: 'uppercase', fontSize: '0.72rem', letterSpacing: '0.5px', color: 'text.secondary', borderBottom: `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}` }}>Created Time</TableCell>
+                      <TableCell sx={{ fontWeight: 700, textTransform: 'uppercase', fontSize: '0.72rem', letterSpacing: '0.5px', color: 'text.secondary', borderBottom: `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}` }} align="center">Actions</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
                     {filteredOrders.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={10} align="center" sx={{ py: 6, color: 'text.secondary' }}>
+                        <TableCell colSpan={10} align="center" sx={{ py: 7, color: 'text.secondary' }}>
                           No matching confirmation workflow found.
                         </TableCell>
                       </TableRow>
@@ -517,21 +656,21 @@ const OrderConfirmationCenter: React.FC = () => {
                         const smsNotif = orderNotifs.find((n: any) => n.provider === communicationSettings?.smsProvider);
 
                         return (
-                          <TableRow key={o.id} hover>
-                            <TableCell sx={{ fontWeight: 700, color: 'primary.main' }}>
+                          <TableRow key={o.id} hover sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
+                            <TableCell sx={{ fontWeight: 700, color: 'primary.main', fontSize: '0.85rem' }}>
                               #{o.id.split('-')[1]}
                             </TableCell>
-                            <TableCell sx={{ fontWeight: 600 }}>{o.customerName}</TableCell>
-                            <TableCell>{o.customerPhone}</TableCell>
+                            <TableCell sx={{ fontWeight: 600, fontSize: '0.85rem' }}>{o.customerName}</TableCell>
+                            <TableCell sx={{ fontSize: '0.825rem', color: 'text.secondary' }}>{o.customerPhone}</TableCell>
                             <TableCell>
                               <Chip 
                                 size="small"
                                 label={waNotif ? waNotif.status.toUpperCase() : 'NOT SENT'}
                                 sx={{ 
-                                  fontWeight: 700, fontSize: '0.65rem', borderRadius: '4px',
+                                  fontWeight: 700, fontSize: '0.625rem', borderRadius: '4px',
                                   bgcolor: 
                                     waNotif?.status === 'delivered' || waNotif?.status === 'read' ? 'rgba(16,185,129,0.1)' :
-                                    waNotif?.status === 'failed' ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.05)',
+                                    waNotif?.status === 'failed' ? 'rgba(239,68,68,0.1)' : 'rgba(156,163,175,0.1)',
                                   color: 
                                     waNotif?.status === 'delivered' || waNotif?.status === 'read' ? 'success.main' :
                                     waNotif?.status === 'failed' ? 'error.main' : 'text.secondary'
@@ -543,17 +682,17 @@ const OrderConfirmationCenter: React.FC = () => {
                                 size="small"
                                 label={smsNotif ? smsNotif.status.toUpperCase() : 'NOT SENT'}
                                 sx={{ 
-                                  fontWeight: 700, fontSize: '0.65rem', borderRadius: '4px',
+                                  fontWeight: 700, fontSize: '0.625rem', borderRadius: '4px',
                                   bgcolor: 
                                     smsNotif?.status === 'delivered' ? 'rgba(16,185,129,0.1)' :
-                                    smsNotif?.status === 'failed' ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.05)',
+                                    smsNotif?.status === 'failed' ? 'rgba(239,68,68,0.1)' : 'rgba(156,163,175,0.1)',
                                   color: 
                                     smsNotif?.status === 'delivered' ? 'success.main' :
                                     smsNotif?.status === 'failed' ? 'error.main' : 'text.secondary'
                                 }}
                               />
                             </TableCell>
-                            <TableCell sx={{ fontWeight: 600, color: 'primary.main' }}>
+                            <TableCell sx={{ fontWeight: 700, color: o.customer_reply?.toUpperCase() === 'YES' ? 'success.main' : o.customer_reply?.toUpperCase() === 'NO' ? 'error.main' : 'text.primary', fontSize: '0.85rem' }}>
                               {o.customer_reply || '-'}
                             </TableCell>
                             <TableCell>
@@ -561,7 +700,7 @@ const OrderConfirmationCenter: React.FC = () => {
                                 size="small"
                                 label={o.status}
                                 sx={{ 
-                                  fontWeight: 700, fontSize: '0.65rem', borderRadius: '6px',
+                                  fontWeight: 700, fontSize: '0.625rem', borderRadius: '6px',
                                   bgcolor: 
                                     o.status === 'Pending' ? 'rgba(245,158,11,0.1)' :
                                     o.status === 'Preparing' ? 'rgba(4,120,87,0.1)' :
@@ -573,37 +712,77 @@ const OrderConfirmationCenter: React.FC = () => {
                                 }}
                               />
                             </TableCell>
-                            <TableCell sx={{ textTransform: 'capitalize' }}>{o.confirmation_source || '-'}</TableCell>
+                            <TableCell sx={{ textTransform: 'capitalize', fontSize: '0.825rem', color: 'text.secondary' }}>{o.confirmation_source || '-'}</TableCell>
                             <TableCell sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>
-                              {new Date(o.createdAt).toLocaleString()}
+                              {new Date(o.createdAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
                             </TableCell>
                             <TableCell align="center">
-                              <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center' }}>
+                              <Box sx={{ display: 'flex', gap: 0.75, justifyContent: 'center' }}>
                                 <Tooltip title="View Order Timeline">
-                                  <IconButton size="small" color="primary" onClick={() => setSelectedOrderId(o.id)}>
-                                    <Eye size={16} />
+                                  <IconButton 
+                                    size="small" 
+                                    onClick={() => setSelectedOrderId(o.id)}
+                                    sx={{ 
+                                      color: 'primary.main', 
+                                      bgcolor: 'rgba(27,67,50,0.04)',
+                                      '&:hover': { bgcolor: 'rgba(27,67,50,0.12)' }
+                                    }}
+                                  >
+                                    <Eye size={15} />
                                   </IconButton>
                                 </Tooltip>
                                 <Tooltip title="Simulate Chat & Webhook Replies">
-                                  <IconButton size="small" color="secondary" onClick={() => { setChatOrderId(o.id); setChatOpen(true); }}>
-                                    <MessageSquare size={16} />
+                                  <IconButton 
+                                    size="small" 
+                                    onClick={() => { setChatOrderId(o.id); setChatOpen(true); }}
+                                    sx={{ 
+                                      color: 'secondary.main', 
+                                      bgcolor: 'rgba(255,107,0,0.04)',
+                                      '&:hover': { bgcolor: 'rgba(255,107,0,0.12)' }
+                                    }}
+                                  >
+                                    <MessageSquare size={15} />
                                   </IconButton>
                                 </Tooltip>
                                 {o.confirmation_status === 'Pending' && (
                                   <>
                                     <Tooltip title="Resend Notification Template">
-                                      <IconButton size="small" color="info" onClick={() => handleResend(o.id, 'both')}>
-                                        <RefreshCcw size={16} />
+                                      <IconButton 
+                                        size="small" 
+                                        onClick={() => handleResend(o.id, 'both')}
+                                        sx={{ 
+                                          color: 'info.main', 
+                                          bgcolor: 'rgba(3,105,161,0.04)',
+                                          '&:hover': { bgcolor: 'rgba(3,105,161,0.12)' }
+                                        }}
+                                      >
+                                        <RefreshCcw size={15} />
                                       </IconButton>
                                     </Tooltip>
                                     <Tooltip title="Force Confirm (Admin Override)">
-                                      <IconButton size="small" sx={{ color: 'success.main' }} onClick={() => handleForceConfirm(o.id)}>
-                                        <Check size={16} />
+                                      <IconButton 
+                                        size="small" 
+                                        onClick={() => handleForceConfirm(o.id)}
+                                        sx={{ 
+                                          color: 'success.main', 
+                                          bgcolor: 'rgba(16,185,129,0.04)',
+                                          '&:hover': { bgcolor: 'rgba(16,185,129,0.12)' }
+                                        }}
+                                      >
+                                        <Check size={15} />
                                       </IconButton>
                                     </Tooltip>
                                     <Tooltip title="Force Cancel (Admin Override)">
-                                      <IconButton size="small" sx={{ color: 'error.main' }} onClick={() => handleForceCancel(o.id)}>
-                                        <X size={16} />
+                                      <IconButton 
+                                        size="small" 
+                                        onClick={() => handleForceCancel(o.id)}
+                                        sx={{ 
+                                          color: 'error.main', 
+                                          bgcolor: 'rgba(239,68,68,0.04)',
+                                          '&:hover': { bgcolor: 'rgba(239,68,68,0.12)' }
+                                        }}
+                                      >
+                                        <X size={15} />
                                       </IconButton>
                                     </Tooltip>
                                   </>
@@ -652,29 +831,41 @@ const OrderConfirmationCenter: React.FC = () => {
                   </Box>
                 </Grid>
 
-                {/* 2. Provider success rate Bar chart */}
-                <Grid item xs={12} md={4}>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 2, fontFamily: 'Outfit' }}>Carrier Delivery Handshake Success</Typography>
-                  <Box sx={{ height: 300, width: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 4 }}>
-                    <Card sx={{ bgcolor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
-                      <CardContent sx={{ p: 2 }}>
-                        <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 600 }}>WhatsApp Delivery Success Rate</Typography>
-                        <Typography variant="h3" sx={{ fontWeight: 800, fontFamily: 'Outfit', color: 'success.main', mt: 1 }}>
-                          {analyticsData.waSuccessRate}%
-                        </Typography>
-                      </CardContent>
-                    </Card>
+                 {/* 2. Provider success rate Bar chart */}
+                 <Grid item xs={12} md={4}>
+                   <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 2, fontFamily: 'Outfit' }}>Carrier Delivery Handshake Success</Typography>
+                   <Box sx={{ height: 300, width: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 4 }}>
+                     <Card sx={{ 
+                       bgcolor: theme.palette.mode === 'dark' ? 'rgba(30, 41, 59, 0.4)' : '#ffffff', 
+                       border: theme.palette.mode === 'dark' ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.08)',
+                       borderLeft: '4px solid #10B981',
+                       boxShadow: theme.palette.mode === 'dark' ? 'none' : '0 4px 20px rgba(0,0,0,0.03)',
+                       borderRadius: 3
+                     }}>
+                       <CardContent sx={{ p: 2.5 }}>
+                         <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 700, textTransform: 'uppercase', fontSize: '0.68rem', letterSpacing: '0.5px' }}>WhatsApp Delivery Success Rate</Typography>
+                         <Typography variant="h3" sx={{ fontWeight: 800, fontFamily: 'Outfit', color: 'success.main', mt: 1 }}>
+                           {analyticsData.waSuccessRate}%
+                         </Typography>
+                       </CardContent>
+                     </Card>
 
-                    <Card sx={{ bgcolor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
-                      <CardContent sx={{ p: 2 }}>
-                        <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 600 }}>SMS Gateway Success Rate</Typography>
-                        <Typography variant="h3" sx={{ fontWeight: 800, fontFamily: 'Outfit', color: 'info.main', mt: 1 }}>
-                          {analyticsData.smsSuccessRate}%
-                        </Typography>
-                      </CardContent>
-                    </Card>
-                  </Box>
-                </Grid>
+                     <Card sx={{ 
+                       bgcolor: theme.palette.mode === 'dark' ? 'rgba(30, 41, 59, 0.4)' : '#ffffff', 
+                       border: theme.palette.mode === 'dark' ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.08)',
+                       borderLeft: '4px solid #0EA5E9',
+                       boxShadow: theme.palette.mode === 'dark' ? 'none' : '0 4px 20px rgba(0,0,0,0.03)',
+                       borderRadius: 3
+                     }}>
+                       <CardContent sx={{ p: 2.5 }}>
+                         <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 700, textTransform: 'uppercase', fontSize: '0.68rem', letterSpacing: '0.5px' }}>SMS Gateway Success Rate</Typography>
+                         <Typography variant="h3" sx={{ fontWeight: 800, fontFamily: 'Outfit', color: 'info.main', mt: 1 }}>
+                           {analyticsData.smsSuccessRate}%
+                         </Typography>
+                       </CardContent>
+                     </Card>
+                   </Box>
+                 </Grid>
 
                 {/* 3. Average confirmation time bar chart */}
                 <Grid item xs={12} md={6}>
@@ -736,32 +927,32 @@ const OrderConfirmationCenter: React.FC = () => {
 
           {/* Tab 2: Logs tab */}
           {activeTab === 2 && (
-            <Box sx={{ p: 3 }}>
+            <Box sx={{ p: 3.5 }}>
               <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 2.5, fontFamily: 'Outfit' }}>System Outbox Gateway Logs</Typography>
-              <TableContainer>
+              <TableContainer sx={{ border: `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`, borderRadius: 3 }}>
                 <Table size="small">
-                  <TableHead>
+                  <TableHead sx={{ bgcolor: theme.palette.mode === 'dark' ? 'rgba(15, 23, 42, 0.4)' : 'rgba(0,0,0,0.02)' }}>
                     <TableRow>
-                      <TableCell sx={{ fontWeight: 700 }}>Log ID</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }}>Order ID</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }}>Channel / Provider</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }}>Delivery State</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }}>Retry Count</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }}>Sent Time</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }}>Delivery Confirmation</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }}>Provider Feedback</TableCell>
+                      <TableCell sx={{ fontWeight: 700, textTransform: 'uppercase', fontSize: '0.72rem', letterSpacing: '0.5px', color: 'text.secondary', borderBottom: `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}` }}>Log ID</TableCell>
+                      <TableCell sx={{ fontWeight: 700, textTransform: 'uppercase', fontSize: '0.72rem', letterSpacing: '0.5px', color: 'text.secondary', borderBottom: `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}` }}>Order ID</TableCell>
+                      <TableCell sx={{ fontWeight: 700, textTransform: 'uppercase', fontSize: '0.72rem', letterSpacing: '0.5px', color: 'text.secondary', borderBottom: `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}` }}>Channel / Provider</TableCell>
+                      <TableCell sx={{ fontWeight: 700, textTransform: 'uppercase', fontSize: '0.72rem', letterSpacing: '0.5px', color: 'text.secondary', borderBottom: `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}` }}>Delivery State</TableCell>
+                      <TableCell sx={{ fontWeight: 700, textTransform: 'uppercase', fontSize: '0.72rem', letterSpacing: '0.5px', color: 'text.secondary', borderBottom: `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}` }}>Retry Count</TableCell>
+                      <TableCell sx={{ fontWeight: 700, textTransform: 'uppercase', fontSize: '0.72rem', letterSpacing: '0.5px', color: 'text.secondary', borderBottom: `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}` }}>Sent Time</TableCell>
+                      <TableCell sx={{ fontWeight: 700, textTransform: 'uppercase', fontSize: '0.72rem', letterSpacing: '0.5px', color: 'text.secondary', borderBottom: `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}` }}>Delivery Confirmation</TableCell>
+                      <TableCell sx={{ fontWeight: 700, textTransform: 'uppercase', fontSize: '0.72rem', letterSpacing: '0.5px', color: 'text.secondary', borderBottom: `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}` }}>Provider Feedback</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
                     {notifications.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={8} align="center" sx={{ py: 5, color: 'text.secondary' }}>No gateway packets logged.</TableCell>
+                        <TableCell colSpan={8} align="center" sx={{ py: 6, color: 'text.secondary' }}>No gateway packets logged.</TableCell>
                       </TableRow>
                     ) : (
                       notifications.map((n: any) => (
-                        <TableRow key={n.id} hover>
+                        <TableRow key={n.id} hover sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
                           <TableCell sx={{ fontFamily: 'Courier New', fontSize: '0.75rem', fontWeight: 600 }}>{n.id.split('-')[1] || n.id}</TableCell>
-                          <TableCell sx={{ fontWeight: 700, color: 'primary.main' }}>#{n.order_id.split('-')[1] || n.order_id}</TableCell>
+                          <TableCell sx={{ fontWeight: 700, color: 'primary.main', fontSize: '0.85rem' }}>#{n.order_id.split('-')[1] || n.order_id}</TableCell>
                           <TableCell sx={{ textTransform: 'capitalize' }}>
                             <Chip size="small" label={`${n.provider || 'SMS'}`} sx={{ height: 18, fontSize: '0.6rem', fontWeight: 700 }} />
                           </TableCell>
@@ -773,10 +964,10 @@ const OrderConfirmationCenter: React.FC = () => {
                                 n.status === 'delivered' || n.status === 'read' ? 'success' :
                                 n.status === 'failed' ? 'error' : 'warning'
                               }
-                              sx={{ height: 18, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase' }}
+                              sx={{ height: 18, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', borderRadius: '4px' }}
                             />
                           </TableCell>
-                          <TableCell align="center" sx={{ fontWeight: 700 }}>{n.retry_count || 0}</TableCell>
+                          <TableCell align="center" sx={{ fontWeight: 700, fontSize: '0.85rem' }}>{n.retry_count || 0}</TableCell>
                           <TableCell sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>{new Date(n.sent_at).toLocaleTimeString()}</TableCell>
                           <TableCell sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>{n.delivered_at ? new Date(n.delivered_at).toLocaleTimeString() : '-'}</TableCell>
                           <TableCell sx={{ fontSize: '0.75rem', fontFamily: 'Courier New', color: n.status === 'failed' ? 'error.main' : 'text.secondary' }}>
@@ -794,36 +985,48 @@ const OrderConfirmationCenter: React.FC = () => {
       </Card>
 
       {/* 1. Modal: Timeline view */}
-      <Dialog open={selectedOrderId !== null} onClose={() => setSelectedOrderId(null)} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ fontFamily: 'Outfit', fontWeight: 700, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          Order confirmation Timeline
+      <Dialog open={selectedOrderId !== null} onClose={() => setSelectedOrderId(null)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3.5 } }}>
+        <DialogTitle sx={{ fontFamily: 'Outfit', fontWeight: 800, display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1 }}>
+          Order Confirmation Timeline
           <IconButton onClick={() => setSelectedOrderId(null)}>
             <X size={18} />
           </IconButton>
         </DialogTitle>
-        <DialogContent sx={{ py: 3 }}>
+        <DialogContent sx={{ py: 2.5 }}>
           {selectedOrder && (
             <Box>
-              <Box sx={{ mb: 4, p: 2, bgcolor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 2 }}>
-                <Typography variant="body2"><strong>Customer:</strong> {selectedOrder.customerName} ({selectedOrder.customerPhone})</Typography>
-                <Typography variant="body2" sx={{ mt: 1 }}><strong>Order Total:</strong> ₹{selectedOrder.total.toFixed(2)}</Typography>
-                <Typography variant="body2" sx={{ mt: 1 }}><strong>Destination Address:</strong> {selectedOrder.address}</Typography>
+              <Box sx={{ 
+                mb: 4, 
+                p: 2.5, 
+                bgcolor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)', 
+                border: `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`, 
+                borderRadius: 3 
+              }}>
+                <Typography variant="body2" sx={{ fontSize: '0.85rem' }}><strong>Customer:</strong> {selectedOrder.customerName} ({selectedOrder.customerPhone})</Typography>
+                <Typography variant="body2" sx={{ mt: 1, fontSize: '0.85rem' }}><strong>Order Total:</strong> ₹{selectedOrder.total.toFixed(2)}</Typography>
+                <Typography variant="body2" sx={{ mt: 1, fontSize: '0.85rem' }}><strong>Destination Address:</strong> {selectedOrder.address}</Typography>
               </Box>
 
               {/* Time Leap Simulator Control inside Detail Modal */}
               {selectedOrder.confirmation_status === 'Pending' && (
-                <Box sx={{ mb: 4, p: 2, border: '1px dashed #FF6B00', borderRadius: 2, bgcolor: 'rgba(255, 107, 0, 0.03)' }}>
-                  <Typography variant="caption" sx={{ fontWeight: 700, color: '#FF6B00', display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-                    <AlertTriangle size={14} /> SIMULATOR: Fast-Forward Order Time Policy
+                <Box sx={{ 
+                  mb: 4, 
+                  p: 2.5, 
+                  border: '1px dashed #FF6B00', 
+                  borderRadius: 3, 
+                  bgcolor: 'rgba(255, 107, 0, 0.03)' 
+                }}>
+                  <Typography variant="caption" sx={{ fontWeight: 800, color: '#FF6B00', display: 'flex', alignItems: 'center', gap: 1, mb: 1.5, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    <AlertTriangle size={14} /> Simulator Policy: Time Warp control
                   </Typography>
-                  <Box sx={{ display: 'flex', gap: 1.5 }}>
-                    <Button size="small" variant="outlined" color="primary" onClick={() => handleTimeLeap(selectedOrder.id, 2.1)}>
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
+                    <Button size="small" variant="outlined" color="primary" onClick={() => handleTimeLeap(selectedOrder.id, 2.1)} sx={{ textTransform: 'none', borderRadius: 2, fontWeight: 600 }}>
                       Leap +2 Hours (Reminder 1)
                     </Button>
-                    <Button size="small" variant="outlined" color="primary" onClick={() => handleTimeLeap(selectedOrder.id, 6.1)}>
+                    <Button size="small" variant="outlined" color="primary" onClick={() => handleTimeLeap(selectedOrder.id, 6.1)} sx={{ textTransform: 'none', borderRadius: 2, fontWeight: 600 }}>
                       Leap +6 Hours (Reminder 2)
                     </Button>
-                    <Button size="small" variant="outlined" color="error" onClick={() => handleTimeLeap(selectedOrder.id, 24.1)}>
+                    <Button size="small" variant="outlined" color="error" onClick={() => handleTimeLeap(selectedOrder.id, 24.1)} sx={{ textTransform: 'none', borderRadius: 2, fontWeight: 600 }}>
                       Leap +24 Hours (Expire)
                     </Button>
                   </Box>
@@ -831,17 +1034,32 @@ const OrderConfirmationCenter: React.FC = () => {
               )}
 
               {/* Timeline pipeline */}
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3.5, position: 'relative', pl: 3, '&::before': { content: '""', position: 'absolute', left: 11, top: 4, bottom: 4, width: '2px', bgcolor: 'divider' } }}>
+              <Box sx={{ 
+                display: 'flex', 
+                flexDirection: 'column', 
+                gap: 3.5, 
+                position: 'relative', 
+                pl: 3.5, 
+                '&::before': { 
+                  content: '""', 
+                  position: 'absolute', 
+                  left: 11, 
+                  top: 4, 
+                  bottom: 4, 
+                  width: '2px', 
+                  bgcolor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' 
+                } 
+              }}>
                 {selectedOrder.timeline.map((step: any, index: number) => (
                   <Box key={index} sx={{ position: 'relative' }}>
                     <Box sx={{ 
-                      position: 'absolute', left: -27, top: 2, width: 16, height: 16, borderRadius: '50%', 
+                      position: 'absolute', left: -31, top: 2, width: 14, height: 14, borderRadius: '50%', 
                       bgcolor: step.status.includes('Confirmed') ? 'success.main' : step.status.includes('Cancelled') || step.status.includes('Failed') || step.status.includes('Expired') ? 'error.main' : 'primary.main',
-                      border: '4px solid #0A0F1D', zIndex: 2
+                      border: `4px solid ${theme.palette.background.paper}`, zIndex: 2
                     }} />
-                    <Typography variant="body2" sx={{ fontWeight: 700 }}>{step.title || step.status}</Typography>
-                    <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 0.5 }}>{step.description}</Typography>
-                    <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.7rem', display: 'block', mt: 0.5 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 700, fontSize: '0.875rem' }}>{step.title || step.status}</Typography>
+                    <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 0.5, lineHeight: 1.4 }}>{step.description}</Typography>
+                    <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.7rem', display: 'block', mt: 0.5, opacity: 0.8 }}>
                       {new Date(step.timestamp).toLocaleString()}
                     </Typography>
                   </Box>
@@ -853,16 +1071,27 @@ const OrderConfirmationCenter: React.FC = () => {
       </Dialog>
 
       {/* 2. Modal: Chat simulator and webhook reply */}
-      <Dialog open={chatOpen} onClose={() => { setChatOpen(false); setChatOrderId(null); }} maxWidth="md" fullWidth>
-        <DialogTitle sx={{ fontFamily: 'Outfit', fontWeight: 700, borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+      <Dialog open={chatOpen} onClose={() => { setChatOpen(false); setChatOrderId(null); }} maxWidth="md" fullWidth PaperProps={{ sx: { borderRadius: 4 } }}>
+        <DialogTitle sx={{ 
+          fontFamily: 'Outfit', 
+          fontWeight: 800, 
+          borderBottom: `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.08)'}`,
+          pb: 2 
+        }}>
           Interactive Customer Conversations Simulator
         </DialogTitle>
-        <DialogContent sx={{ p: 0, height: 500, display: 'flex' }}>
+        <DialogContent sx={{ p: 0, height: 500, display: 'flex', flexDirection: { xs: 'column', md: 'row' } }}>
           {/* Chat thread */}
-          <Box sx={{ width: '60%', display: 'flex', flexDirection: 'column', bgcolor: 'rgba(0,0,0,0.15)' }}>
-            <Box sx={{ flexGrow: 1, p: 3, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <Box sx={{ 
+            width: { xs: '100%', md: '60%' }, 
+            height: { xs: '50%', md: '100%' }, 
+            display: 'flex', 
+            flexDirection: 'column', 
+            bgcolor: theme.palette.mode === 'dark' ? 'rgba(15, 23, 42, 0.25)' : 'rgba(0,0,0,0.015)' 
+          }}>
+            <Box sx={{ flexGrow: 1, p: 3, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2.5 }}>
               {chatHistory.length === 0 ? (
-                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: 'text.secondary' }}>
+                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: 'text.secondary', fontSize: '0.85rem' }}>
                   No messages exchanged for this order.
                 </Box>
               ) : (
@@ -873,18 +1102,19 @@ const OrderConfirmationCenter: React.FC = () => {
                       key={chat.id} 
                       sx={{ 
                         alignSelf: isOutgoing ? 'flex-end' : 'flex-start',
-                        maxWidth: '80%',
-                        bgcolor: isOutgoing ? 'rgba(255, 107, 0, 0.12)' : 'rgba(255, 255, 255, 0.05)',
-                        border: isOutgoing ? '1px solid rgba(255, 107, 0, 0.2)' : '1px solid rgba(255, 255, 255, 0.08)',
+                        maxWidth: '85%',
+                        bgcolor: isOutgoing ? 'rgba(255, 107, 0, 0.08)' : (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.03)' : '#ffffff'),
+                        border: isOutgoing ? '1px solid rgba(255, 107, 0, 0.15)' : `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.08)'}`,
                         borderRadius: 3.5,
+                        boxShadow: isOutgoing ? 'none' : '0 2px 8px rgba(0,0,0,0.02)',
                         px: 2.5, py: 1.5
                       }}
                     >
-                      <Typography variant="body2" sx={{ whiteSpace: 'pre-line', color: isOutgoing ? 'primary.main' : 'text.primary' }}>
+                      <Typography variant="body2" sx={{ whiteSpace: 'pre-line', color: isOutgoing ? 'primary.main' : 'text.primary', fontSize: '0.85rem', lineHeight: 1.5 }}>
                         {chat.message}
                       </Typography>
-                      <Typography variant="caption" sx={{ display: 'block', textAlign: 'right', mt: 0.5, opacity: 0.5, fontSize: '0.65rem' }}>
-                        {new Date(chat.timestamp).toLocaleTimeString()} via {chat.provider.toUpperCase()}
+                      <Typography variant="caption" sx={{ display: 'block', textAlign: 'right', mt: 0.75, opacity: 0.6, fontSize: '0.625rem', fontWeight: 600 }}>
+                        {new Date(chat.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} via {chat.provider.toUpperCase()}
                       </Typography>
                     </Box>
                   );
@@ -894,15 +1124,23 @@ const OrderConfirmationCenter: React.FC = () => {
           </Box>
 
           {/* Webhook Response simulator Panel */}
-          <Box sx={{ width: '40%', p: 3, borderLeft: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', gap: 3.5 }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 700, fontFamily: 'Outfit', display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Terminal size={16} color="#FF6B00" /> Webhooks Callback Simulator
+          <Box sx={{ 
+            width: { xs: '100%', md: '40%' }, 
+            p: 3.5, 
+            borderLeft: { md: `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.08)'}` },
+            borderTop: { xs: `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.08)'}`, md: 'none' },
+            display: 'flex', 
+            flexDirection: 'column', 
+            gap: 3 
+          }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 800, fontFamily: 'Outfit', display: 'flex', alignItems: 'center', gap: 1, textTransform: 'uppercase', letterSpacing: '0.5px', fontSize: '0.78rem', color: 'primary.main' }}>
+              <Terminal size={15} /> Webhooks Callback Simulator
             </Typography>
-            <Typography variant="caption" sx={{ color: 'text.secondary', lineHeight: 1.6 }}>
+            <Typography variant="caption" sx={{ color: 'text.secondary', lineHeight: 1.6, fontSize: '0.78rem' }}>
               Simulate an incoming HTTP webhook callback from WhatsApp or SMS provider servers. This parses responses through signature validators and updates order statuses in real-time.
             </Typography>
 
-            <FormControl fullWidth size="small">
+            <FormControl fullWidth size="small" sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2.5 } }}>
               <InputLabel>Simulated Carrier Channel</InputLabel>
               <Select value={simChannel} label="Simulated Carrier Channel" onChange={e => setSimChannel(e.target.value as any)}>
                 <MenuItem value="whatsapp">Meta WhatsApp Cloud API Gateway</MenuItem>
@@ -910,7 +1148,7 @@ const OrderConfirmationCenter: React.FC = () => {
               </Select>
             </FormControl>
 
-            <form onSubmit={handleSendSimChat} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <form onSubmit={handleSendSimChat} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <TextField
                 fullWidth
                 multiline
@@ -920,14 +1158,23 @@ const OrderConfirmationCenter: React.FC = () => {
                 onChange={e => setSimText(e.target.value)}
                 placeholder="Type YES to confirm order, NO to cancel order, or custom text..."
                 helperText="Send 'YES' or 'NO' to verify automatic status transitions"
+                sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2.5 } }}
               />
               <Button 
                 type="submit" 
                 variant="contained" 
-                color="secondary" 
+                color="primary" 
                 fullWidth
                 disabled={sendingSim || !simText.trim()}
-                startIcon={sendingSim ? <CircularProgress size={16} color="inherit" /> : <Send size={16} />}
+                startIcon={sendingSim ? <CircularProgress size={15} color="inherit" /> : <Send size={15} />}
+                sx={{ 
+                  borderRadius: 2.5, 
+                  py: 1.25, 
+                  textTransform: 'none', 
+                  fontWeight: 700,
+                  boxShadow: 'none',
+                  '&:hover': { boxShadow: 'none' }
+                }}
               >
                 {sendingSim ? 'Invoking Callback...' : 'Trigger Webhook Callback'}
               </Button>
