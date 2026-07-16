@@ -6,6 +6,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 function getPythonCommand() {
+  // 1. Try global PATH aliases
   const commands = ['python', 'py', 'python3'];
   for (const cmd of commands) {
     try {
@@ -15,6 +16,32 @@ function getPythonCommand() {
       // Continue searching
     }
   }
+
+  // 2. Try common Windows absolute installation paths
+  const userProfile = process.env.USERPROFILE || 'C:\\Users\\pc';
+  const commonPaths = [
+    path.join(userProfile, 'AppData\\Local\\Programs\\Python\\Python312\\python.exe'),
+    path.join(userProfile, 'AppData\\Local\\Programs\\Python\\Python311\\python.exe'),
+    path.join(userProfile, 'AppData\\Local\\Programs\\Python\\Python310\\python.exe'),
+    path.join(userProfile, 'AppData\\Local\\Programs\\Python\\Python39\\python.exe'),
+    path.join(userProfile, 'AppData\\Local\\Programs\\Python\\Python38\\python.exe'),
+    'C:\\Program Files\\Python312\\python.exe',
+    'C:\\Program Files\\Python311\\python.exe',
+    'C:\\Program Files\\Python310\\python.exe',
+    'C:\\Program Files\\Python39\\python.exe',
+    'C:\\Program Files\\Python38\\python.exe',
+    path.join(userProfile, 'AppData\\Local\\Microsoft\\WindowsApps\\python.exe')
+  ];
+
+  for (const p of commonPaths) {
+    try {
+      execSync(`"${p}" --version`, { stdio: 'ignore' });
+      return `"${p}"`;
+    } catch (e) {
+      // Path not found or not executable
+    }
+  }
+
   return null;
 }
 
@@ -27,7 +54,7 @@ if (!pyCmd) {
 }
 
 const scriptPath = path.join(__dirname, 'main.py');
-console.log(`[Python Launcher] Using command: "${pyCmd}"`);
+console.log(`[Python Launcher] Using command: ${pyCmd}`);
 console.log(`[Python Launcher] Starting FastAPI backend: ${scriptPath}`);
 
 const pythonProcess = spawn(pyCmd, [scriptPath], {
