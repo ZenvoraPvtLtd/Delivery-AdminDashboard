@@ -273,7 +273,7 @@ router.post('/webhook/sms', async (req, res) => {
     const startSim = req.app.get('startOrderSimulation');
     if (startSim) startSim(order.id);
 
-    setTimeout(async () =>>,StartLine:265,TargetContent: {
+    setTimeout(async () => {
       await queueNotification(io, { orderId: order.id, type: 'success' });
     }, 100);
 

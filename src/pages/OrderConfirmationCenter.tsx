@@ -5,12 +5,13 @@ import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, 
   Chip, IconButton, Divider, Tooltip, Alert, Tabs, Tab, Avatar,
   InputLabel, FormControl, Select, MenuItem, useTheme, Modal, 
-  CircularProgress, Badge, Paper
+  CircularProgress, Badge, Paper, Dialog, DialogTitle, DialogContent
 } from '@mui/material';
 import { 
   Search, Eye, MessageSquare, Phone, RefreshCcw, CheckCircle, 
   XCircle, Clock, Download, ArrowUpRight, BarChart2, ListTodo, 
-  AlertTriangle, Check, X, ShieldAlert, Send, Calendar, RefreshCw
+  AlertTriangle, Check, X, ShieldAlert, Send, Calendar, RefreshCw,
+  Terminal
 } from 'lucide-react';
 import { 
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, 
@@ -19,13 +20,13 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 import { 
-  RootState, addNotification, addAuditLog, fetchDb,
+  RootState, AppDispatch, addNotification, addAuditLog, fetchDb,
   updateOrderConfirmation, addNotificationLog, addConversationLog
 } from '../store';
 
 const OrderConfirmationCenter: React.FC = () => {
   const theme = useTheme();
-  const dispatch = useDispatch();
+  const dispatch = useDispatch<AppDispatch>();
   
   const currentUser = useSelector((state: RootState) => state.auth.user);
   const orders = useSelector((state: RootState) => state.db.orders);
@@ -145,7 +146,7 @@ const OrderConfirmationCenter: React.FC = () => {
         o.id.toLowerCase().includes(searchLower) ||
         o.customerName.toLowerCase().includes(searchLower) ||
         o.customerPhone.includes(searchLower) ||
-        (o.customerReply && o.customerReply.toLowerCase().includes(searchLower));
+        (o.customer_reply && o.customer_reply.toLowerCase().includes(searchLower));
 
       // Status filters
       let matchesStatus = true;
