@@ -1,5 +1,6 @@
 import os
 import logging
+import certifi
 from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo.errors import ConnectionFailure, OperationFailure
 
@@ -12,6 +13,7 @@ DEFAULT_DB_NAME = "delivery_db"
 class Database:
     client: AsyncIOMotorClient = None
     db = None
+    is_mock = False
 
     @classmethod
     async def connect(cls):
@@ -21,12 +23,16 @@ class Database:
         uri = os.getenv("MONGODB_URI")
         db_name = os.getenv("DATABASE_NAME", DEFAULT_DB_NAME)
 
+        # Retrieve CA certificate bundle file
+        ca_file = certifi.where()
+
         if uri and "<db_password>" not in uri:
             try:
                 cls.client = AsyncIOMotorClient(
                     uri,
                     maxPoolSize=50,
                     minPoolSize=10,
+                    tlsCAFile=ca_file,
                     serverSelectionTimeoutMS=5000
                 )
                 cls.db = cls.client[db_name]
@@ -38,7 +44,8 @@ class Database:
                 logger.error(f"Failed to connect using env MONGODB_URI: {e}")
 
         # Auto-detect which candidate password works
-        passwords = ["Mp09zz4160", "mp09zz4160"]
+        passwords = ["Mp094160", "mp094160", "Mp09zz4160", "mp09zz4160"]
+
         for pwd in passwords:
             test_uri = MONGODB_URI_TEMPLATE.format(pwd)
             try:
@@ -47,6 +54,7 @@ class Database:
                     test_uri,
                     maxPoolSize=50,
                     minPoolSize=10,
+                    tlsCAFile=ca_file,
                     serverSelectionTimeoutMS=4000
                 )
                 await client.admin.command('ping')
@@ -58,7 +66,14 @@ class Database:
             except Exception as e:
                 logger.warning(f"Password '{pwd}' failed to connect to Atlas cluster: {e}")
 
-        raise ConnectionFailure("Could not establish a connection to MongoDB Atlas using the provided credentials.")
+        # Graceful Local Fallback instead of crash
+        cls.is_mock = True
+        logger.critical("=" * 80)
+        logger.critical("CRITICAL: MongoDB Atlas connection failed (Authentication / Whitelist Issue).")
+        logger.critical("DATABASE FALLBACK: Server is operating in Local JSON Fallback Mode ('db.json').")
+        logger.critical("Please whitelist your current IP address and verify your credentials in MongoDB Atlas.")
+        logger.critical("=" * 80)
+
 
     @classmethod
     async def close(cls):

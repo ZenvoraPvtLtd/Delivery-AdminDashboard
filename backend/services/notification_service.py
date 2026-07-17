@@ -12,6 +12,48 @@ from services.sms_service import TwilioSmsService
 
 logger = logging.getLogger("delivery_admin.notification_service")
 
+# Helper functions to abstract database access and support local JSON fallback
+async def get_db_settings() -> dict:
+    if Database.is_mock:
+        from repositories.base_repository import load_local_db
+        db_data = load_local_db()
+        return db_data.get("communicationSettings", {})
+    settings_doc = await Database.db.settings.find_one({"is_deleted": False})
+    return settings_doc if settings_doc else {}
+
+async def insert_conversation(msg: dict):
+    if Database.is_mock:
+        from repositories.base_repository import load_local_db, save_local_db
+        db_data = load_local_db()
+        db_data.setdefault("conversations", []).append(msg)
+        save_local_db(db_data)
+    else:
+        await Database.db.conversations.insert_one(msg)
+
+async def insert_notification(notif: dict):
+    if Database.is_mock:
+        from repositories.base_repository import load_local_db, save_local_db
+        db_data = load_local_db()
+        db_data.setdefault("notifications", []).append(notif)
+        save_local_db(db_data)
+    else:
+        await Database.db.notifications.insert_one(notif)
+
+async def count_reminders(order_id: str) -> int:
+    if Database.is_mock:
+        from repositories.base_repository import load_local_db
+        db_data = load_local_db()
+        return len([
+            n for n in db_data.get("notifications", [])
+            if n.get("order_id") == order_id and n.get("type") == "reminder" and n.get("status") != "failed"
+        ])
+    return await Database.db.notifications.count_documents({
+        "order_id": order_id,
+        "type": "reminder",
+        "status": {"$ne": "failed"},
+        "is_deleted": False
+    })
+
 # Helper to compile templates
 def compile_template(template: str, vars: dict) -> str:
     compiled = template
@@ -55,7 +97,7 @@ class NotificationService:
             "created_at": datetime.now(),
             "updated_at": datetime.now()
         }
-        # Save to MongoDB notifications collection
+        # Save to database (base repo redirects to local JSON or MongoDB automatically)
         await NotificationRepository.create(log_entry)
         return log_entry
 
@@ -110,8 +152,7 @@ class NotificationService:
             logger.error(f"[Notification Queue] Order not found: {order_id}")
             return
 
-        settings_doc = await Database.db.settings.find_one({"is_deleted": False})
-        settings = settings_doc if settings_doc else {}
+        settings = await get_db_settings()
 
         customer_phone = order["customerPhone"]
         customer_name = order["customerName"]
@@ -164,7 +205,7 @@ class NotificationService:
                     "created_at": datetime.now(),
                     "updated_at": datetime.now()
                 }
-                await Database.db.conversations.insert_one(out_message)
+                await insert_conversation(out_message)
                 await sio.emit("new_chat", out_message)
 
                 # Timeline update
@@ -175,8 +216,6 @@ class NotificationService:
                     "description": "WhatsApp confirmation message dispatched successfully." if res["success"] else f"WhatsApp dispatch failed: {res['response']}"
                 }
                 await OrderRepository.add_timeline_event(order_id, timeline_event)
-                
-                updated_order = await OrderRepository.get_by_id(order_id)
                 
                 # Specific twilio schema parameters addition to Order
                 await OrderRepository.update(order_id, {
@@ -228,7 +267,7 @@ class NotificationService:
                     "created_at": datetime.now(),
                     "updated_at": datetime.now()
                 }
-                await Database.db.conversations.insert_one(out_message)
+                await insert_conversation(out_message)
                 await sio.emit("new_chat", out_message)
 
                 # Timeline
@@ -272,7 +311,7 @@ class NotificationService:
                 "created_at": datetime.now(),
                 "updated_at": datetime.now()
             }
-            await Database.db.notifications.insert_one(alert_notif)
+            await insert_notification(alert_notif)
             
             timeline_event = {
                 "status": "Delivery Failed",
@@ -300,8 +339,7 @@ class NotificationService:
             return
 
         now = datetime.now()
-        settings_doc = await Database.db.settings.find_one({"is_deleted": False})
-        settings = settings_doc if settings_doc else {}
+        settings = await get_db_settings()
         expiry_hours = settings.get("confirmationExpiry", 24)
 
         from main import sio
@@ -319,12 +357,7 @@ class NotificationService:
             elapsed_hours = (now - requested_at).total_seconds() / 3600.0
 
             # Count reminders
-            reminder_count = await Database.db.notifications.count_documents({
-                "order_id": order["id"],
-                "type": "reminder",
-                "status": {"$ne": "failed"},
-                "is_deleted": False
-            })
+            reminder_count = await count_reminders(order["id"])
 
             # Check Expiry
             if elapsed_hours >= expiry_hours:
@@ -356,7 +389,7 @@ class NotificationService:
                     "created_at": datetime.now(),
                     "updated_at": datetime.now()
                 }
-                await Database.db.notifications.insert_one(alert_notif)
+                await insert_notification(alert_notif)
 
                 await sio.emit("new_notification", alert_notif)
                 updated_order = await OrderRepository.get_by_id(order["id"])

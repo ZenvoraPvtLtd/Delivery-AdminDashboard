@@ -201,7 +201,10 @@ async def seed_database():
     """
     Auto-seed database collection from INITIAL_DB snapshot if cluster is empty.
     """
+    if Database.is_mock:
+        return
     outlets_count = await Database.db.outlets.count_documents({})
+
     if outlets_count == 0:
         logger.info("MongoDB cluster collection is empty. Auto-seeding initial database snapshot...")
         
@@ -242,9 +245,13 @@ async def load_db_async() -> dict:
     Asynchronous bridge that retrieves MongoDB collections and generates a dictionary snapshot.
     Ensures absolute compatibility with chatbot.py and the frontend's /api/db endpoint.
     """
+    if Database.is_mock:
+        from repositories.base_repository import load_local_db
+        return load_local_db()
     db = Database.db
     if not db:
         return INITIAL_DB
+
 
     # Retrieve all collections
     outlets = await db.outlets.find({"is_deleted": False}).to_list(length=100)
@@ -303,6 +310,17 @@ def load_db() -> dict:
         return loop.run_until_complete(load_db_async())
     except Exception:
         return INITIAL_DB
+
+async def get_settings_helper() -> dict:
+    if Database.is_mock:
+        from repositories.base_repository import load_local_db
+        db = load_local_db()
+        return db.get("communicationSettings", INITIAL_DB["communicationSettings"])
+    settings_doc = await Database.db.settings.find_one({"is_deleted": False})
+    if settings_doc:
+        settings_doc["_id"] = str(settings_doc["_id"])
+        return settings_doc
+    return INITIAL_DB["communicationSettings"]
 
 # Background Scheduler Monitor Loop
 async def scheduler_loop():
@@ -536,8 +554,9 @@ async def update_order_status_endpoint(order_id: str, payload: OrderStatusUpdate
 
     # Deliver SMS notification cascades
     try:
-        settings_doc = await Database.db.settings.find_one({"is_deleted": False})
-        await NotificationService.trigger_delivery_update_flow(updated_order, settings_doc or {}, payload.status)
+        settings_doc = await get_settings_helper()
+        await NotificationService.trigger_delivery_update_flow(updated_order, settings_doc, payload.status)
+
     except Exception as e:
         logger.error(f"Failed to trigger status update outbox log: {e}")
 
@@ -671,9 +690,16 @@ async def add_audit_log_endpoint(payload: dict):
         "updated_at": datetime.now(),
         **payload
     }
-    await Database.db.audit_logs.insert_one(log)
-    log["_id"] = str(log["_id"])
+    if Database.is_mock:
+        from repositories.base_repository import load_local_db, save_local_db
+        db = load_local_db()
+        db.setdefault("auditLogs", []).insert(0, log)
+        save_local_db(db)
+    else:
+        await Database.db.audit_logs.insert_one(log)
+        log["_id"] = str(log["_id"])
     return {"success": True, "log": log}
+
 
 # Create Order Payload and endpoint
 class OrderItemPayload(BaseModel):
@@ -702,8 +728,8 @@ class NewOrderPayload(BaseModel):
 
 @app.post("/api/orders")
 async def create_order_endpoint(payload: NewOrderPayload):
-    settings_doc = await Database.db.settings.find_one({"is_deleted": False})
-    settings = settings_doc if settings_doc else {}
+    settings = await get_settings_helper()
+
 
     is_conf_enabled = settings.get("enableWhatsapp", True) or settings.get("enableSms", True)
     now = datetime.now()
@@ -792,8 +818,8 @@ async def send_confirmation_endpoint(payload: OrderIdPayload):
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 
-    settings_doc = await Database.db.settings.find_one({"is_deleted": False})
-    settings = settings_doc if settings_doc else {}
+    settings = await get_settings_helper()
+
     expiry_hours = settings.get("confirmationExpiry", 24)
     now = datetime.now()
 
@@ -858,9 +884,15 @@ async def webhook_sms_endpoint(payload: WebhookPayload):
             "created_at": datetime.now(),
             "updated_at": datetime.now()
         }
+    if Database.is_mock:
+        from repositories.base_repository import load_local_db, save_local_db
+        db = load_local_db()
+        db.setdefault("conversations", []).append(in_message)
+        save_local_db(db)
+    else:
         await Database.db.conversations.insert_one(in_message)
-        await sio.emit("new_chat", in_message)
-        return {"success": False, "message": "No active order found."}
+    await sio.emit("new_chat", in_message)
+    return {"success": False, "message": "No active order found."}
 
     order_id = matching_order["id"]
     conv_id = f"conv-{int(time.time() * 1000)}"
@@ -876,13 +908,19 @@ async def webhook_sms_endpoint(payload: WebhookPayload):
         "created_at": datetime.now(),
         "updated_at": datetime.now()
     }
-    await Database.db.conversations.insert_one(in_message)
+    if Database.is_mock:
+        from repositories.base_repository import load_local_db, save_local_db
+        db = load_local_db()
+        db.setdefault("conversations", []).append(in_message)
+        save_local_db(db)
+    else:
+        await Database.db.conversations.insert_one(in_message)
     await sio.emit("new_chat", in_message)
 
     await OrderRepository.update(order_id, {"customer_reply": text, "updated_at": datetime.now()})
 
-    settings_doc = await Database.db.settings.find_one({"is_deleted": False})
-    comm_settings = settings_doc or {}
+    comm_settings = await get_settings_helper()
+
 
     clean_text = text.upper()
     if any(k in clean_text for k in ["YES", "CONFIRM", "OK"]):
@@ -907,8 +945,8 @@ async def webhook_sms_endpoint(payload: WebhookPayload):
 
 @app.post("/api/orders/confirm")
 async def force_confirm_endpoint(payload: OrderIdPayload):
-    settings_doc = await Database.db.settings.find_one({"is_deleted": False})
-    success = await OrderService.confirm_order(payload.orderId, "admin", "Forced Confirm by Administrator", settings_doc or {})
+    settings = await get_settings_helper()
+    success = await OrderService.confirm_order(payload.orderId, "admin", "Forced Confirm by Administrator", settings)
     if success:
         order = await OrderRepository.get_by_id(payload.orderId)
         order["_id"] = str(order["_id"])
@@ -921,8 +959,9 @@ class CancelPayload(BaseModel):
 
 @app.post("/api/orders/cancel")
 async def force_cancel_endpoint(payload: CancelPayload):
-    settings_doc = await Database.db.settings.find_one({"is_deleted": False})
-    success = await OrderService.cancel_order(payload.orderId, "admin", payload.reason, settings_doc or {})
+    settings = await get_settings_helper()
+    success = await OrderService.cancel_order(payload.orderId, "admin", payload.reason, settings)
+
     if success:
         order = await OrderRepository.get_by_id(payload.orderId)
         order["_id"] = str(order["_id"])
@@ -1080,6 +1119,10 @@ async def simulate_time_leap_endpoint(payload: SimulateTimeLeapPayload):
 
 @app.get("/api/orders/conversations/{order_id}")
 async def get_conversations_endpoint(order_id: str):
+    if Database.is_mock:
+        from repositories.base_repository import load_local_db
+        db = load_local_db()
+        return [c for c in db.get("conversations", []) if c.get("order_id") == order_id]
     cursor = Database.db.conversations.find({"order_id": order_id, "is_deleted": False}).sort("timestamp", 1)
     convs = await cursor.to_list(length=100)
     for c in convs:
@@ -1088,6 +1131,10 @@ async def get_conversations_endpoint(order_id: str):
 
 @app.get("/api/orders/settings")
 async def get_settings_endpoint():
+    if Database.is_mock:
+        from repositories.base_repository import load_local_db
+        db = load_local_db()
+        return db.get("communicationSettings", INITIAL_DB["communicationSettings"])
     settings_doc = await Database.db.settings.find_one({"is_deleted": False})
     if settings_doc:
         settings_doc["_id"] = str(settings_doc["_id"])
@@ -1104,13 +1151,20 @@ async def save_settings_endpoint(request: Request):
     if "_id" in new_settings:
         del new_settings["_id"]
 
-    await Database.db.settings.update_one(
-        {"is_deleted": False},
-        {"$set": new_settings},
-        upsert=True
-    )
+    if Database.is_mock:
+        from repositories.base_repository import load_local_db, save_local_db
+        db = load_local_db()
+        db["communicationSettings"] = new_settings
+        save_local_db(db)
+    else:
+        await Database.db.settings.update_one(
+            {"is_deleted": False},
+            {"$set": new_settings},
+            upsert=True
+        )
     
     await sio.emit("communication_settings_updated", new_settings)
+
     return {"success": True, "settings": new_settings}
 
 if __name__ == "__main__":

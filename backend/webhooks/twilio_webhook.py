@@ -21,6 +21,15 @@ def normalize_phone(phone: str) -> str:
     # Return last 10 digits
     return digits[-10:]
 
+async def save_conversation(chat: dict):
+    if Database.is_mock:
+        from repositories.base_repository import load_local_db, save_local_db
+        db = load_local_db()
+        db.setdefault("conversations", []).append(chat)
+        save_local_db(db)
+    else:
+        await Database.db.conversations.insert_one(chat)
+
 @router.post("", response_class=PlainTextResponse)
 async def twilio_incoming_callback(
     request: Request,
@@ -33,19 +42,16 @@ async def twilio_incoming_callback(
     """
     Unified Twilio Webhook receiving incoming SMS and WhatsApp customer replies.
     """
-    logger.info(f"[Twilio Webhook] Received webhook event: SID={message_sid}, From={from_number}, To={to_number}, Body=\"{body}\"")
+    logger.info(f"[Twilio Webhook] Received webhook event: From={from_number}, Body=\"{body}\"")
 
     # 1. Twilio Request Signature Security Validation
     auth_token = os.getenv("TWILIO_AUTH_TOKEN", "mock-token")
     if auth_token != "mock-token" and x_twilio_signature:
         validator = RequestValidator(auth_token)
         form_params = dict(await request.form())
-        # Reconstruct absolute URL to verify signature
         url = str(request.url)
-        # Fallback to absolute url checks behind proxy tunnels
         if not validator.validate(url, form_params, x_twilio_signature):
             logger.error(f"[Twilio Webhook] Security signature verification failed for X-Twilio-Signature: {x_twilio_signature}")
-            # Raise 403 error to protect webhook
             raise HTTPException(status_code=403, detail="Invalid signature validation")
         logger.info("[Twilio Webhook] Signature verified successfully.")
 
@@ -65,7 +71,6 @@ async def twilio_incoming_callback(
 
     if not matching_order:
         logger.warning(f"[Twilio Webhook] No pending order found for phone: {from_number} (Normalized: {norm_phone})")
-        # Save chat logging for unmatched conversations
         conv_id = f"conv-{int(datetime.now().timestamp())}"
         unmatched_chat = {
             "id": conv_id,
@@ -79,12 +84,10 @@ async def twilio_incoming_callback(
             "created_at": datetime.now(),
             "updated_at": datetime.now()
         }
-        await Database.db.conversations.insert_one(unmatched_chat)
+        await save_conversation(unmatched_chat)
         
         from main import sio
         await sio.emit("new_chat", unmatched_chat)
-        
-        # Respond with blank Twilio XML response
         return "<Response></Response>"
 
     order_id = matching_order["id"]
@@ -103,7 +106,7 @@ async def twilio_incoming_callback(
         "created_at": datetime.now(),
         "updated_at": datetime.now()
     }
-    await Database.db.conversations.insert_one(chat_msg)
+    await save_conversation(chat_msg)
 
     # Save customer reply body to order document
     await OrderRepository.update(order_id, {
@@ -136,12 +139,10 @@ async def twilio_incoming_callback(
         }
         await OrderRepository.add_timeline_event(order_id, timeline_event)
         
-        # Broadcast updated timeline to frontend
         updated_order = await OrderRepository.get_by_id(order_id)
         if "_id" in updated_order:
             updated_order["_id"] = str(updated_order["_id"])
         await sio.emit("order_status", { "status": updated_order["status"], "timeline": updated_order["timeline"] }, room=order_id)
         await sio.emit("order_confirmation_updated", updated_order)
 
-    # Return empty response XML to Twilio
     return "<Response></Response>"

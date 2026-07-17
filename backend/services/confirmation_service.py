@@ -6,6 +6,14 @@ from database import Database
 
 logger = logging.getLogger("delivery_admin.confirmation_service")
 
+async def get_db_settings() -> dict:
+    if Database.is_mock:
+        from repositories.base_repository import load_local_db
+        db_data = load_local_db()
+        return db_data.get("communicationSettings", {})
+    settings_doc = await Database.db.settings.find_one({"is_deleted": False})
+    return settings_doc if settings_doc else {}
+
 class ConfirmationService:
     @classmethod
     async def confirm_order(cls, order_id: str, channel: str, reply_text: str, message_id: str) -> bool:
@@ -70,8 +78,7 @@ class ConfirmationService:
             from services.sms_service import TwilioSmsService
             
             # Fetch communication settings
-            settings_doc = await Database.db.settings.find_one({"is_deleted": False})
-            settings = settings_doc if settings_doc else {}
+            settings = await get_db_settings()
 
             phone = order.get("customerPhone")
             name = order.get("customerName")
@@ -143,8 +150,7 @@ class ConfirmationService:
             from services.sms_service import TwilioSmsService
             
             # Fetch communication settings
-            settings_doc = await Database.db.settings.find_one({"is_deleted": False})
-            settings = settings_doc if settings_doc else {}
+            settings = await get_db_settings()
 
             phone = order.get("customerPhone")
             name = order.get("customerName")
