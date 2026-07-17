@@ -11,3 +11,4 @@ python-socketio>=5.10.0
 websockets>=11.0
 pymongo[srv]>=4.5.0
 dnspython>=2.0.0
+twilio>=9.0.0

@@ -48,9 +48,11 @@ from services.order_service import OrderService
 from services.delivery_service import DeliveryService
 from services.notification_service import NotificationService
 from webhooks.whatsapp import router as whatsapp_webhook_router
+from webhooks.twilio_webhook import router as twilio_webhook_router
 
-# Mount the WhatsApp webhook router
+# Mount webhook routers
 app.include_router(whatsapp_webhook_router)
+app.include_router(twilio_webhook_router)
 
 # Initial mock data fallback (used to seed empty databases)
 INITIAL_DB = {
@@ -1113,4 +1115,4 @@ async def save_settings_endpoint(request: Request):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:socket_app", host="127.0.0.1", port=8000, reload=True)
+    uvicorn.run("main:socket_app", host="127.0.0.1", port=8008, reload=True)

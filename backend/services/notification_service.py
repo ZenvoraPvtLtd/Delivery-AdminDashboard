@@ -7,6 +7,8 @@ from repositories.order_repository import OrderRepository
 from repositories.notification_repository import NotificationRepository
 from repositories.base_repository import BaseRepository
 from database import Database
+from services.whatsapp_service import TwilioWhatsappService
+from services.sms_service import TwilioSmsService
 
 logger = logging.getLogger("delivery_admin.notification_service")
 
@@ -27,60 +29,33 @@ def compile_template(template: str, vars: dict) -> str:
         compiled = compiled.replace(f"{{{{ {key} }}}}", str(val))
     return compiled
 
-# Messaging Engine Simulator
-async def send_provider_message(channel: str, provider: str, customer_phone: str, attempt: int) -> dict:
-    logger.info(f"[Notification Engine] Dispatching via {channel.upper()} ({provider}) to {customer_phone} (Retry: {attempt})")
-    is_failure = False
-    reason = "Simulated delivery success"
-
-    if channel == "whatsapp":
-        if customer_phone.endswith("9") or customer_phone.endswith("8"):
-            is_failure = True
-            reason = "Provider error code 500: Gateway Timeout"
-    elif channel == "sms":
-        if customer_phone.endswith("8"):
-            is_failure = True
-            reason = "Carrier error code 30008: Destination unreachable"
-
-    await asyncio.sleep(0.8)
-    timestamp = datetime.now().isoformat()
-
-    if is_failure:
-        logger.warning(f"[Notification Engine] Message delivery failed on {channel}: {reason}")
-        return {
-            "success": False,
-            "status": "failed",
-            "sent_at": timestamp,
-            "provider_response": reason
-        }
-    logger.info(f"[Notification Engine] Message delivered on {channel} successfully.")
-    return {
-        "success": True,
-        "status": "delivered",
-        "sent_at": timestamp,
-        "delivered_at": timestamp,
-        "provider_response": "OK: Message Queued & Delivered"
-    }
-
 class NotificationService:
     @classmethod
-    async def create_log(cls, order_id: str, customer_id: str, msg_type: str, provider: str, status: str, response: str = "") -> dict:
+    async def create_twilio_log(cls, order_id: str, customer_id: str, msg_type: str, provider: str, status: str, text: str, sid: str, response: str, channel: str) -> dict:
+        """
+        Record a notification log following the exact Twilio Notification spec fields.
+        """
         log_id = f"notif-{int(datetime.now().timestamp())}-{order_id.split('-')[-1]}"
         log_entry = {
-            "id": log_id,
-            "order_id": order_id,
+            "notification_id": log_id,
+            "id": log_id, # for compatibility with frontend mapping
             "customer_id": customer_id,
+            "order_id": order_id,
             "type": msg_type,
+            "sms": text if channel == "sms" else "",
+            "whatsapp": text if channel == "whatsapp" else "",
             "provider": provider,
+            "provider_message_sid": sid,
             "status": status,
+            "response": response,
             "retry_count": 0,
             "sent_at": datetime.now().isoformat(),
-            "delivered_at": datetime.now().isoformat() if status in ["delivered", "read"] else None,
-            "provider_response": response,
+            "delivered_at": datetime.now().isoformat() if status == "delivered" else None,
             "is_deleted": False,
             "created_at": datetime.now(),
             "updated_at": datetime.now()
         }
+        # Save to MongoDB notifications collection
         await NotificationRepository.create(log_entry)
         return log_entry
 
@@ -91,25 +66,42 @@ class NotificationService:
         order_id = order.get("id")
         customer_id = order.get("customerId", "")
 
-        from services.whatsapp_service import WhatsappService
-        from services.sms_service import SmsService
-
         # 1. WhatsApp Cancellation
         if settings.get("enableWhatsapp", True):
-            whatsapp_provider = settings.get("whatsappProvider", "meta")
-            success = await WhatsappService.send_order_cancelled(phone, name, order_id)
-            await cls.create_log(order_id, customer_id, "cancellation", whatsapp_provider, "delivered" if success else "failed")
+            res = await TwilioWhatsappService.send_order_cancelled(phone, name, order_id)
+            await cls.create_twilio_log(order_id, customer_id, "cancellation", "twilio", res["status"], f"Order #{order_id.split('-')[-1]} cancelled", res["sid"], res["response"], "whatsapp")
 
         # 2. SMS Cancellation
         if settings.get("enableSms", True):
-            sms_provider = settings.get("smsProvider", "twilio")
-            success = await SmsService.send_order_cancelled(phone, name, order_id)
-            await cls.create_log(order_id, customer_id, "cancellation", sms_provider, "delivered" if success else "failed")
+            res = await TwilioSmsService.send_order_cancelled(phone, name, order_id)
+            await cls.create_twilio_log(order_id, customer_id, "cancellation", "twilio", res["status"], f"Order #{order_id.split('-')[-1]} cancelled", res["sid"], res["response"], "sms")
+
+        return True
+
+    @classmethod
+    async def trigger_delivery_update_flow(cls, order: dict, settings: dict, status: str) -> bool:
+        phone = order.get("customerPhone")
+        name = order.get("customerName")
+        order_id = order.get("id")
+        customer_id = order.get("customerId", "")
+
+        # 1. WhatsApp status update
+        if settings.get("enableWhatsapp", True):
+            res = await TwilioWhatsappService.send_delivery_update(phone, name, order_id, status)
+            await cls.create_twilio_log(order_id, customer_id, "delivery_update", "twilio", res["status"], f"Status: {status}", res["sid"], res["response"], "whatsapp")
+
+        # 2. SMS status update
+        if settings.get("enableSms", True):
+            res = await TwilioSmsService.send_delivery_update(phone, name, order_id, status)
+            await cls.create_twilio_log(order_id, customer_id, "delivery_update", "twilio", res["status"], f"Status: {status}", res["sid"], res["response"], "sms")
 
         return True
 
     @classmethod
     async def queue_notification(cls, order_id: str, type: str, custom_data: dict = None):
+        """
+        Sends notifications (WhatsApp, fallback to SMS) and records status into database.
+        """
         if custom_data is None:
             custom_data = {}
         
@@ -120,21 +112,6 @@ class NotificationService:
 
         settings_doc = await Database.db.settings.find_one({"is_deleted": False})
         settings = settings_doc if settings_doc else {}
-        if not settings:
-            # Fallback to default
-            settings = {
-                "enableWhatsapp": True,
-                "enableSms": True,
-                "whatsappProvider": "meta",
-                "smsProvider": "twilio",
-                "retryCount": 3,
-                "templates": {
-                    "confirmation": "Hello {{CustomerName}}, please confirm your Delivo Order #{{OrderID}} of {{Items}} totaling ${{Amount}}. Reply YES to Confirm or NO to Cancel.",
-                    "cancellation": "Hello {{CustomerName}}, your Delivo Order #{{OrderID}} has been cancelled successfully.",
-                    "success": "Woohoo {{CustomerName}}! Your Order #{{OrderID}} is confirmed.",
-                    "reminder": "Urgent {{CustomerName}}: Your Order #{{OrderID}} is awaiting confirmation."
-                }
-            }
 
         customer_phone = order["customerPhone"]
         customer_name = order["customerName"]
@@ -155,9 +132,7 @@ class NotificationService:
         message_text = compile_template(template_text, template_vars)
 
         current_channel = "whatsapp" if settings.get("enableWhatsapp", True) else "sms"
-        provider = settings.get("whatsappProvider", "meta") if current_channel == "whatsapp" else settings.get("smsProvider", "twilio")
         status = "failed"
-        response_data = None
         attempt = 0
         max_retries = settings.get("retryCount", 3)
 
@@ -165,46 +140,17 @@ class NotificationService:
 
         if current_channel == "whatsapp":
             while attempt <= max_retries:
-                notif_id = f"notif-{int(time.time() * 1000)}-{random.randint(0, 999)}"
-                new_notif = {
-                    "id": notif_id,
-                    "order_id": order_id,
-                    "provider": provider,
-                    "type": type,
-                    "status": "sent",
-                    "message": message_text,
-                    "sent_at": datetime.now().isoformat(),
-                    "delivered_at": None,
-                    "read_at": None,
-                    "reply_at": None,
-                    "retry_count": attempt,
-                    "provider_response": "Sending...",
-                    "is_deleted": False,
-                    "created_at": datetime.now(),
-                    "updated_at": datetime.now()
-                }
-                await NotificationRepository.create(new_notif)
+                # 1. WhatsApp confirmation dispatch
+                res = await TwilioWhatsappService.send_order_confirmation(customer_phone, customer_name, order_id, order["total"])
+                
+                # Create/save logs
+                new_notif = await cls.create_twilio_log(
+                    order_id, customer_id, type, "twilio", res["status"], 
+                    message_text, res["sid"], res["response"], "whatsapp"
+                )
                 await sio.emit("new_notification", new_notif)
 
-                response_data = await send_provider_message("whatsapp", provider, customer_phone, attempt)
-
-                # Update notification
-                update_fields = {
-                    "status": response_data["status"],
-                    "delivered_at": response_data.get("delivered_at"),
-                    "provider_response": response_data["provider_response"],
-                    "updated_at": datetime.now()
-                }
-                if response_data["success"]:
-                    update_fields["read_at"] = (datetime.now() + timedelta(seconds=1.5)).isoformat()
-                
-                await NotificationRepository.update(notif_id, update_fields)
-                
-                # Emit updated notification
-                updated_notif = await NotificationRepository.get_by_id(notif_id)
-                await sio.emit("new_notification", updated_notif)
-
-                # Log conversation
+                # Log conversation record
                 conv_id = f"conv-{int(time.time() * 1000)}-{random.randint(0, 999)}"
                 out_message = {
                     "id": conv_id,
@@ -226,15 +172,27 @@ class NotificationService:
                     "status": "WhatsApp Sent",
                     "timestamp": datetime.now().isoformat(),
                     "title": f"WhatsApp Confirmation {'Retry ' + str(attempt) if attempt > 0 else 'Sent'}",
-                    "description": "Message delivered successfully to customer's WhatsApp." if response_data["success"] else f"Delivery failed: {response_data['provider_response']}"
+                    "description": "WhatsApp confirmation message dispatched successfully." if res["success"] else f"WhatsApp dispatch failed: {res['response']}"
                 }
                 await OrderRepository.add_timeline_event(order_id, timeline_event)
                 
                 updated_order = await OrderRepository.get_by_id(order_id)
+                
+                # Specific twilio schema parameters addition to Order
+                await OrderRepository.update(order_id, {
+                    "whatsapp_status": res["status"],
+                    "notification_status": res["status"],
+                    "confirmation_message_id": res["sid"]
+                })
+                
+                updated_order = await OrderRepository.get_by_id(order_id)
+                if "_id" in updated_order:
+                    updated_order["_id"] = str(updated_order["_id"])
+
                 await sio.emit("order_status", { "status": updated_order["status"], "timeline": updated_order["timeline"] }, room=order_id)
                 await sio.emit("order_confirmation_updated", updated_order)
 
-                if response_data["success"]:
+                if res["success"]:
                     status = "delivered"
                     break
                 attempt += 1
@@ -242,47 +200,21 @@ class NotificationService:
             if status == "failed" and settings.get("enableSms", True):
                 logger.warning("[Notification Engine] WhatsApp failed. Cascading fallback to SMS...")
                 current_channel = "sms"
-                provider = settings.get("smsProvider", "twilio")
                 attempt = 0
 
         if current_channel == "sms":
+            sms_text = f"Your Order #{order_id.split('-')[-1]} Amount ₹{order['total']:.2f} Reply YES to Confirm Reply NO to Cancel"
             while attempt <= max_retries:
-                notif_id = f"notif-{int(time.time() * 1000)}-{random.randint(0, 999)}"
-                sms_text = f"Your Order #{order_id.split('-')[1] if '-' in order_id else order_id} is waiting for confirmation. Reply YES to Confirm, Reply NO to Cancel."
-                new_notif = {
-                    "id": notif_id,
-                    "order_id": order_id,
-                    "provider": provider,
-                    "type": type,
-                    "status": "sent",
-                    "message": sms_text,
-                    "sent_at": datetime.now().isoformat(),
-                    "delivered_at": None,
-                    "read_at": None,
-                    "reply_at": None,
-                    "retry_count": attempt,
-                    "provider_response": "Sending...",
-                    "is_deleted": False,
-                    "created_at": datetime.now(),
-                    "updated_at": datetime.now()
-                }
-                await NotificationRepository.create(new_notif)
+                # 2. SMS confirmation dispatch
+                res = await TwilioSmsService.send_order_confirmation(customer_phone, customer_name, order_id, order["total"])
+                
+                new_notif = await cls.create_twilio_log(
+                    order_id, customer_id, type, "twilio", res["status"], 
+                    sms_text, res["sid"], res["response"], "sms"
+                )
                 await sio.emit("new_notification", new_notif)
 
-                response_data = await send_provider_message("sms", provider, customer_phone, attempt)
-
-                update_fields = {
-                    "status": response_data["status"],
-                    "delivered_at": response_data.get("delivered_at"),
-                    "provider_response": response_data["provider_response"],
-                    "updated_at": datetime.now()
-                }
-                await NotificationRepository.update(notif_id, update_fields)
-                
-                updated_notif = await NotificationRepository.get_by_id(notif_id)
-                await sio.emit("new_notification", updated_notif)
-
-                # Log conversation
+                # Log conversation record
                 conv_id = f"conv-{int(time.time() * 1000)}-{random.randint(0, 999)}"
                 out_message = {
                     "id": conv_id,
@@ -304,25 +236,35 @@ class NotificationService:
                     "status": "SMS Sent",
                     "timestamp": datetime.now().isoformat(),
                     "title": f"SMS Confirmation {'Retry ' + str(attempt) if attempt > 0 else 'Sent'}",
-                    "description": "SMS delivered successfully to customer's mobile number." if response_data["success"] else f"SMS Delivery failed: {response_data['provider_response']}"
+                    "description": "SMS confirmation message dispatched successfully to customer's mobile." if res["success"] else f"SMS dispatch failed: {res['response']}"
                 }
                 await OrderRepository.add_timeline_event(order_id, timeline_event)
                 
+                # Specific twilio schema parameters addition to Order
+                await OrderRepository.update(order_id, {
+                    "sms_status": res["status"],
+                    "notification_status": res["status"],
+                    "confirmation_message_id": res["sid"]
+                })
+                
                 updated_order = await OrderRepository.get_by_id(order_id)
+                if "_id" in updated_order:
+                    updated_order["_id"] = str(updated_order["_id"])
+
                 await sio.emit("order_status", { "status": updated_order["status"], "timeline": updated_order["timeline"] }, room=order_id)
                 await sio.emit("order_confirmation_updated", updated_order)
 
-                if response_data["success"]:
+                if res["success"]:
                     status = "delivered"
                     break
                 attempt += 1
 
         if status == "failed":
-            logger.critical(f"[Notification Engine] Critical: WhatsApp and SMS both failed for Order #{order_id}")
+            logger.critical(f"[Notification Engine] Twilio fallback warning: WhatsApp and SMS both failed for Order #{order_id}")
             alert_notif = {
                 "id": f"alert-{int(time.time() * 1000)}",
                 "title": "Confirmation Delivery Failure",
-                "description": f"Unable to reach {customer_name} ({customer_phone}) for Order #{order_id.split('-')[1] if '-' in order_id else order_id}. All channels failed.",
+                "description": f"Unable to reach {customer_name} ({customer_phone}) for Order #{order_id.split('-')[-1]}. Twilio dispatch failed.",
                 "type": "system",
                 "timestamp": datetime.now().isoformat(),
                 "read": False,
@@ -330,17 +272,20 @@ class NotificationService:
                 "created_at": datetime.now(),
                 "updated_at": datetime.now()
             }
-            await NotificationRepository.get_collection().database.notifications.insert_one(alert_notif)
+            await Database.db.notifications.insert_one(alert_notif)
             
             timeline_event = {
                 "status": "Delivery Failed",
                 "timestamp": datetime.now().isoformat(),
                 "title": "Communication Channels Blocked",
-                "description": "Both WhatsApp and SMS carriers rejected delivery attempts. Admin intervention required."
+                "description": "Twilio WhatsApp and SMS carriers rejected delivery attempts. Admin intervention required."
             }
             await OrderRepository.add_timeline_event(order_id, timeline_event)
             
             updated_order = await OrderRepository.get_by_id(order_id)
+            if "_id" in updated_order:
+                updated_order["_id"] = str(updated_order["_id"])
+
             await sio.emit("order_status", { "status": updated_order["status"], "timeline": updated_order["timeline"] }, room=order_id)
             await sio.emit("order_confirmation_updated", updated_order)
             await sio.emit("new_notification", alert_notif)
@@ -415,6 +360,8 @@ class NotificationService:
 
                 await sio.emit("new_notification", alert_notif)
                 updated_order = await OrderRepository.get_by_id(order["id"])
+                if "_id" in updated_order:
+                    updated_order["_id"] = str(updated_order["_id"])
                 await sio.emit("order_status", { "status": updated_order["status"], "timeline": updated_order["timeline"] }, room=order["id"])
                 await sio.emit("order_confirmation_updated", updated_order)
                 continue
