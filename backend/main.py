@@ -1,20 +1,25 @@
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from typing import List, Optional, Dict, Any
-import json
 import os
 import sys
+import logging
 import random
 import time
 import asyncio
 from datetime import datetime, timedelta
+from typing import List, Optional, Dict, Any
+from fastapi import FastAPI, HTTPException, Request, Depends, Query
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 import socketio
 
 # Ensure the server directory is in python path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-app = FastAPI()
+# Structured logging configuration
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("delivery_admin.main")
+
+app = FastAPI(title="DelivoAdmin API", version="1.0.0")
 
 # Enable CORS for frontend integration
 app.add_middleware(
@@ -29,9 +34,25 @@ app.add_middleware(
 sio = socketio.AsyncServer(async_mode='asgi', cors_allowed_origins='*')
 socket_app = socketio.ASGIApp(sio, app)
 
-DB_FILE = os.path.join(os.path.dirname(__file__), "db.json")
+# Database & Architecture Imports
+from database import Database
+from repositories.base_repository import BaseRepository
+from repositories.customer_repository import CustomerRepository
+from repositories.order_repository import OrderRepository
+from repositories.product_repository import ProductRepository
+from repositories.delivery_repository import DeliveryPartnerRepository
+from repositories.coupon_repository import CouponRepository
+from repositories.offer_repository import OfferRepository
+from repositories.outlet_repository import OutletRepository
+from services.order_service import OrderService
+from services.delivery_service import DeliveryService
+from services.notification_service import NotificationService
+from webhooks.whatsapp import router as whatsapp_webhook_router
 
-# Initial mock data fallback
+# Mount the WhatsApp webhook router
+app.include_router(whatsapp_webhook_router)
+
+# Initial mock data fallback (used to seed empty databases)
 INITIAL_DB = {
   "outlets": [
     { "id": "out-1", "name": "Downtown Central Outlet", "address": "124 Market St, Downtown", "manager": "Sarah Jenkins", "phone": "+1 555-0192", "status": "Open", "revenue": 15480, "ordersCount": 420, "taxNumber": "GST-33AABCC1234D", "hours": "08:00 AM - 11:00 PM", "latitude": 40.7128, "longitude": -74.0060 },
@@ -41,10 +62,10 @@ INITIAL_DB = {
   ],
   "products": [
     { "id": "prod-1", "name": "Truffle Mushroom Burger", "category": "Fast Food", "subcategory": "Burgers", "price": 12.99, "discount": 10, "availability": True, "preparationTime": 12, "isVeg": True, "isBestSeller": True, "image": "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400", "outletIds": ["out-1", "out-2", "out-3"], "gstRate": 5, "description": "Freshly grilled portobello mushroom with melted cheese, truffle paste, and signature brioche bun." },
-    { "id": "prod-2", "name": "Spicy Pepperoni Pizza (12\")", "category": "Italian", "subcategory": "Pizza", "price": 16.99, "discount": 0, "availability": True, "preparationTime": 18, "isVeg": False, "isBestSeller": True, "image": "https://images.unsplash.com/photo-1628840042765-356cda07504e?w=400", "outletIds": ["out-1", "out-3", "out-4"], "gstRate": 12, "description": "Crisp sourdough crust topped with spicy premium pepperoni slice, hand-stretched mozzarella, and tangy marinara." },
+    { "id": "prod-2", "name": "Spicy Pepperoni Pizza (12\")", "category": "Italian", "subcategory": "Pizza", "price": 16.99, "discount": 0, "availability": True, "preparationTime": 18, "isVeg": False, "isBestSeller": True, "image": "https://images.unsplash.com/photo-1628840042765-356cda07504e?w=400", "outletIds": ["out-1", "out-3", "out-4"], "gstRate": 12, "description": "Crisp sourdough crust topped with premium pepperoni, hand-stretched mozzarella, and tangy marinara." },
     { "id": "prod-3", "name": "Avocado Toast with Poached Egg", "category": "Breakfast", "subcategory": "Toast", "price": 9.50, "discount": 5, "availability": True, "preparationTime": 8, "isVeg": True, "isBestSeller": False, "image": "https://images.unsplash.com/photo-1525351484163-7529414344d8?w=400", "outletIds": ["out-1", "out-2"], "gstRate": 5, "description": "Smashed Haas avocados, flaky sea salt, organic eggs, sourdough bread toasted with organic butter." },
     { "id": "prod-4", "name": "Iced Vanilla Matcha Latte", "category": "Beverages", "subcategory": "Teas", "price": 5.99, "discount": 0, "availability": True, "preparationTime": 4, "isVeg": True, "isBestSeller": True, "image": "https://images.unsplash.com/photo-1536256263959-770b48d82b0a?w=400", "outletIds": ["out-1", "out-2", "out-3", "out-4"], "gstRate": 5, "description": "Ceremonial grade Japanese Uji matcha whisked with organic oat milk and natural vanilla pod syrup." },
-    { "id": "prod-5", "name": "Crispy Buffalo Chicken Wings (8pcs)", "category": "Snacks", "subcategory": "Appetizers", "price": 11.99, "discount": 15, "availability": True, "preparationTime": 15, "isVeg": False, "isBestSeller": False, "image": "https://images.unsplash.com/photo-1567620832903-9fc6debc209f?w=400", "outletIds": ["out-1", "out-3", "out-4"], "gstRate": 18, "description": "Spicy tossed bone-in chicken wings, glazed with signature hot sauce, served with blue cheese dip." },
+    { "id": "prod-5", "name": "Crispy Buffalo Wings (8pcs)", "category": "Snacks", "subcategory": "Appetizers", "price": 11.99, "discount": 15, "availability": True, "preparationTime": 15, "isVeg": False, "isBestSeller": False, "image": "https://images.unsplash.com/photo-1567620832903-9fc6debc209f?w=400", "outletIds": ["out-1", "out-3", "out-4"], "gstRate": 18, "description": "Spicy wings, glazed with signature hot sauce, served with blue cheese dip." },
     { "id": "prod-6", "name": "Premium Veggie Salad Bowl", "category": "Salads", "subcategory": "Healthy", "price": 10.99, "discount": 0, "availability": True, "preparationTime": 7, "isVeg": True, "isBestSeller": False, "image": "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400", "outletIds": ["out-2", "out-3"], "gstRate": 5, "description": "Baby spinach, quinoa, cherry tomatoes, cucumbers, roasted chickpeas, organic feta, citrus vinaigrette." }
   ],
   "deliveryPartners": [
@@ -74,17 +95,17 @@ INITIAL_DB = {
       "status": "Preparing",
       "paymentStatus": "Paid",
       "paymentMethod": "UPI",
-      "createdAt": datetime.now().isoformat(),
+      "createdAt": (datetime.now() - timedelta(hours=3)).isoformat(),
       "preparationTimeRemaining": 8,
       "address": "Apt 4B, 32 Wall Street, Financial District, NY",
       "orderType": "Delivery",
       "timeline": [
-        { "status": "Pending", "timestamp": datetime.now().isoformat(), "title": "Order Placed", "description": "Order successfully placed by customer." },
-        { "status": "Pending", "timestamp": datetime.now().isoformat(), "title": "Order Confirmed", "description": "Payment verified and order sent to Kitchen." },
-        { "status": "Preparing", "timestamp": datetime.now().isoformat(), "title": "Kitchen Accepted", "description": "Chef Sarah started preparing the items." }
+        { "status": "Pending", "timestamp": (datetime.now() - timedelta(hours=3)).isoformat(), "title": "Order Placed", "description": "Order successfully placed by customer." },
+        { "status": "Pending", "timestamp": (datetime.now() - timedelta(hours=2.8)).isoformat(), "title": "Order Confirmed", "description": "Payment verified and order sent to Kitchen." },
+        { "status": "Preparing", "timestamp": (datetime.now() - timedelta(hours=2.5)).isoformat(), "title": "Kitchen Accepted", "description": "Chef Sarah started preparing the items." }
       ],
       "confirmation_status": "Confirmed",
-      "confirmed_at": datetime.now().isoformat(),
+      "confirmed_at": (datetime.now() - timedelta(hours=2.8)).isoformat(),
       "confirmation_source": "whatsapp"
     },
     {
@@ -106,19 +127,19 @@ INITIAL_DB = {
       "status": "Out for Delivery",
       "paymentStatus": "Paid",
       "paymentMethod": "Card",
-      "createdAt": datetime.now().isoformat(),
+      "createdAt": (datetime.now() - timedelta(hours=1)).isoformat(),
       "deliveryPartnerId": "rider-2",
       "address": "Floor 14, 52 Hudson Yards, Midtown West, NY",
       "orderType": "Delivery",
       "timeline": [
-        { "status": "Pending", "timestamp": datetime.now().isoformat(), "title": "Order Placed", "description": "Order placed by customer." },
-        { "status": "Pending", "timestamp": datetime.now().isoformat(), "title": "Order Confirmed", "description": "Auto-accepted and routed to kitchen." },
-        { "status": "Preparing", "timestamp": datetime.now().isoformat(), "title": "Preparing", "description": "Oven heating, ingredients added." },
-        { "status": "Ready", "timestamp": datetime.now().isoformat(), "title": "Packed & Ready", "description": "Food packed in insulation container." },
-        { "status": "Out for Delivery", "timestamp": datetime.now().isoformat(), "title": "Handed Over to Rider", "description": "Rider Alex Mercer is transit with order." }
+        { "status": "Pending", "timestamp": (datetime.now() - timedelta(hours=1)).isoformat(), "title": "Order Placed", "description": "Order placed by customer." },
+        { "status": "Pending", "timestamp": (datetime.now() - timedelta(hours=0.9)).isoformat(), "title": "Order Confirmed", "description": "Auto-accepted and routed to kitchen." },
+        { "status": "Preparing", "timestamp": (datetime.now() - timedelta(hours=0.8)).isoformat(), "title": "Preparing", "description": "Oven heating, ingredients added." },
+        { "status": "Ready", "timestamp": (datetime.now() - timedelta(hours=0.5)).isoformat(), "title": "Packed & Ready", "description": "Food packed in insulation container." },
+        { "status": "Out for Delivery", "timestamp": (datetime.now() - timedelta(hours=0.2)).isoformat(), "title": "Handed Over to Rider", "description": "Rider Alex Mercer is transit with order." }
       ],
       "confirmation_status": "Confirmed",
-      "confirmed_at": datetime.now().isoformat(),
+      "confirmed_at": (datetime.now() - timedelta(hours=0.9)).isoformat(),
       "confirmation_source": "sms"
     }
   ],
@@ -143,7 +164,7 @@ INITIAL_DB = {
     { "id": "cust-3", "name": "Bruce Wayne", "phone": "+1 555-7700", "email": "bruce@waynecorp.com", "password": "password123", "walletBalance": 9800.00, "rewardPoints": 95000, "status": "Active", "addresses": ["Penthouse A, Wayne Tower, Manhattan, NY", "Wayne Manor, Bristol County, NJ"], "favoriteItems": ["Premium Veggie Salad Bowl"] }
   ],
   "banners": [
-    { "id": "ban-1", "title": "Monsoon Special Combo 25% Off", "image": "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=600", "status": "Active", "type": "Homepage", "schedule": "2026-07-01 to 2026-07-31" },
+    { "id": "ban-1", "title": "Monsoon Combo 25% Off", "image": "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=600", "status": "Active", "type": "Homepage", "schedule": "2026-07-01 to 2026-07-31" },
     { "id": "ban-2", "title": "Delicious Matcha Weekend Special", "image": "https://images.unsplash.com/photo-1536256263959-770b48d82b0a?w=600", "status": "Active", "type": "Offer", "schedule": "Saturday & Sunday" }
   ],
   "communicationSettings": {
@@ -174,535 +195,162 @@ INITIAL_DB = {
   "conversations": []
 }
 
-def load_db() -> dict:
-    if not os.path.exists(DB_FILE):
-        with open(DB_FILE, "w") as f:
-            json.dump(INITIAL_DB, f, indent=2)
+async def seed_database():
+    """
+    Auto-seed database collection from INITIAL_DB snapshot if cluster is empty.
+    """
+    outlets_count = await Database.db.outlets.count_documents({})
+    if outlets_count == 0:
+        logger.info("MongoDB cluster collection is empty. Auto-seeding initial database snapshot...")
+        
+        # 1. Outlets
+        await Database.db.outlets.insert_many([{**o, "is_deleted": False, "created_at": datetime.now(), "updated_at": datetime.now()} for o in INITIAL_DB["outlets"]])
+        
+        # 2. Products
+        await Database.db.products.insert_many([{**p, "is_deleted": False, "created_at": datetime.now(), "updated_at": datetime.now()} for p in INITIAL_DB["products"]])
+        
+        # 3. Delivery Partners
+        await Database.db.delivery_partners.insert_many([{**dp, "is_deleted": False, "created_at": datetime.now(), "updated_at": datetime.now()} for dp in INITIAL_DB["deliveryPartners"]])
+        
+        # 4. Orders
+        await Database.db.orders.insert_many([{**o, "is_deleted": False, "created_at": datetime.now(), "updated_at": datetime.now()} for o in INITIAL_DB["orders"]])
+        
+        # 5. Coupons
+        await Database.db.coupons.insert_many([{**c, "is_deleted": False, "created_at": datetime.now(), "updated_at": datetime.now()} for c in INITIAL_DB["coupons"]])
+        
+        # 6. Raw Materials
+        await Database.db.raw_materials.insert_many([{**rm, "is_deleted": False, "created_at": datetime.now(), "updated_at": datetime.now()} for rm in INITIAL_DB["rawMaterials"]])
+        
+        # 7. Tickets
+        await Database.db.tickets.insert_many([{**t, "is_deleted": False, "created_at": datetime.now(), "updated_at": datetime.now()} for t in INITIAL_DB["tickets"]])
+        
+        # 8. Customers
+        await Database.db.customers.insert_many([{**cust, "is_deleted": False, "created_at": datetime.now(), "updated_at": datetime.now()} for cust in INITIAL_DB["customers"]])
+        
+        # 9. Banners
+        await Database.db.offers.insert_many([{**b, "is_deleted": False, "created_at": datetime.now(), "updated_at": datetime.now()} for b in INITIAL_DB["banners"]])
+        
+        # 10. Settings
+        await Database.db.settings.insert_one({**INITIAL_DB["communicationSettings"], "is_deleted": False, "created_at": datetime.now(), "updated_at": datetime.now()})
+
+        logger.info("Database auto-seeding completed.")
+
+async def load_db_async() -> dict:
+    """
+    Asynchronous bridge that retrieves MongoDB collections and generates a dictionary snapshot.
+    Ensures absolute compatibility with chatbot.py and the frontend's /api/db endpoint.
+    """
+    db = Database.db
+    if not db:
         return INITIAL_DB
+
+    # Retrieve all collections
+    outlets = await db.outlets.find({"is_deleted": False}).to_list(length=100)
+    products = await db.products.find({"is_deleted": False}).to_list(length=100)
+    riders = await db.delivery_partners.find({"is_deleted": False}).to_list(length=100)
+    orders = await db.orders.find({"is_deleted": False}).sort("createdAt", -1).to_list(length=100)
+    coupons = await db.coupons.find({"is_deleted": False}).to_list(length=100)
+    raw_materials = await db.raw_materials.find({"is_deleted": False}).to_list(length=100)
+    tickets = await db.tickets.find({"is_deleted": False}).to_list(length=100)
+    audit_logs = await db.audit_logs.find({"is_deleted": False}).sort("timestamp", -1).to_list(length=100)
+    customers = await db.customers.find({"is_deleted": False}).to_list(length=100)
+    banners = await db.offers.find({"is_deleted": False}).to_list(length=100)
+    notifications = await db.notifications.find({"is_deleted": False}).sort("sent_at", -1).to_list(length=500)
+    conversations = await db.conversations.find({"is_deleted": False}).sort("timestamp", 1).to_list(length=500)
+
+    settings_doc = await db.settings.find_one({"is_deleted": False})
+    if not settings_doc:
+        settings_doc = INITIAL_DB["communicationSettings"]
+
+    # Stringify ObjectId fields for JSON compatibility
+    def clean_docs(doc_list):
+        cleaned = []
+        for doc in doc_list:
+            d = dict(doc)
+            if "_id" in d:
+                d["_id"] = str(d["_id"])
+            cleaned.append(d)
+        return cleaned
+
+    return {
+        "outlets": clean_docs(outlets),
+        "products": clean_docs(products),
+        "deliveryPartners": clean_docs(riders),
+        "orders": clean_docs(orders),
+        "coupons": clean_docs(coupons),
+        "rawMaterials": clean_docs(raw_materials),
+        "tickets": clean_docs(tickets),
+        "auditLogs": clean_docs(audit_logs),
+        "customers": clean_docs(customers),
+        "banners": clean_docs(banners),
+        "communicationSettings": clean_docs([settings_doc])[0] if settings_doc else {},
+        "notifications": clean_docs(notifications),
+        "conversations": clean_docs(conversations)
+    }
+
+# Sync wrapper for loading database fallback
+def load_db() -> dict:
+    """
+    Sync wrapper to run async load_db_async in current thread execution loop.
+    """
     try:
-        with open(DB_FILE, "r") as f:
-            return json.load(f)
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            # Run in executor or another thread if loop is already busy
+            return INITIAL_DB
+        return loop.run_until_complete(load_db_async())
     except Exception:
         return INITIAL_DB
 
-def save_db(data: dict):
-    with open(DB_FILE, "w") as f:
-        json.dump(data, f, indent=2)
-
-# Socket.IO Event Handlers
-@sio.event
-async def connect(sid, environ):
-    print(f"[Socket] Connected: {sid}")
-
-@sio.event
-async def join_order(sid, orderId):
-    await sio.enter_room(sid, orderId)
-    print(f"[Socket] Client {sid} joined tracking room: {orderId}")
-    db = load_db()
-    order = next((o for o in db.get("orders", []) if o["id"] == orderId), None)
-    if order:
-        await sio.emit("order_status", {"status": order["status"], "timeline": order["timeline"]}, room=sid)
-
-@sio.event
-async def disconnect(sid):
-    print(f"[Socket] Disconnected: {sid}")
-
-# Simulation maps
-active_simulations = {}
-
-async def run_order_simulation(order_id: str):
-    print(f"[Simulation] Starting workflow for order: {order_id}")
-    statuses = ['Pending', 'Accepted', 'Preparing', 'Ready', 'Picked Up', 'Out for Delivery', 'Delivered']
-    
-    db = load_db()
-    order = next((o for o in db.get("orders", []) if o["id"] == order_id), None)
-    if not order:
-        return
-        
-    if order["status"] in ['Cancelled', 'Delivered']:
-        print(f"[Simulation] Order {order_id} is already in state: {order['status']}. Skipping simulation.")
-        return
-        
-    try:
-        current_status_index = statuses.index(order["status"])
-    except ValueError:
-        current_status_index = 0
-
-    route_points = []
-    start_lat = 40.7128
-    start_lng = -74.0060
-    end_lat = 40.7306
-    end_lng = -73.9352
-    steps = 12
-
-    for i in range(steps + 1):
-        fraction = i / steps
-        route_points.append({
-            "latitude": start_lat + (end_lat - start_lat) * fraction,
-            "longitude": start_lng + (end_lng - start_lng) * fraction
-        })
-    route_index = 0
-
-    while True:
-        await asyncio.sleep(4)
-        db = load_db()
-        order = next((o for o in db.get("orders", []) if o["id"] == order_id), None)
-        
-        if not order:
-            print(f"[Simulation] Order {order_id} not found, simulation aborted.")
-            break
-            
-        if order["status"] == 'Cancelled':
-            print(f"[Simulation] Order {order_id} has been Cancelled. Simulation aborted.")
-            break
-
-        # Move to next status if we are not at the end
-        if current_status_index < len(statuses) - 1:
-            # If current status is not "Out for Delivery" or if it is and we finished routing
-            if statuses[current_status_index] != 'Out for Delivery' or route_index >= len(route_points):
-                current_status_index += 1
-                next_status = statuses[current_status_index]
-                order["status"] = next_status
-                order["timeline"].append({
-                    "status": next_status,
-                    "timestamp": datetime.now().isoformat(),
-                    "title": f"Order is {next_status}",
-                    "description": get_status_description(next_status)
-                })
-
-                if next_status == 'Delivered':
-                    order["paymentStatus"] = 'Paid'
-                    save_db(db)
-                    await sio.emit('order_status', { "status": 'Delivered', "timeline": order["timeline"] }, room=order_id)
-                    await sio.emit('order_confirmation_updated', order)
-                    print(f"[Simulation] Order {order_id} delivered, simulation stopped.")
-                    break
-
-                save_db(db)
-                await sio.emit('order_status', { "status": next_status, "timeline": order["timeline"] }, room=order_id)
-                await sio.emit('order_confirmation_updated', order)
-                print(f"[Simulation] Order {order_id} transitioned to: {next_status}")
-
-        if order["status"] == 'Out for Delivery':
-            if route_index < len(route_points):
-                point = route_points[route_index]
-                eta = max(1, round((len(route_points) - route_index) * 1.5))
-                distance = float(f"{((len(route_points) - route_index) * 0.35):.2f}")
-
-                await sio.emit('rider_location', {
-                    "latitude": point["latitude"],
-                    "longitude": point["longitude"],
-                    "etaMinutes": eta,
-                    "distanceKm": distance,
-                    "riderName": "Alex Mercer",
-                    "riderPhone": "+1 555-0233",
-                    "riderAvatar": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100"
-                }, room=order_id)
-                route_index += 1
-
-def start_order_simulation(order_id: str):
-    if order_id in active_simulations:
-        return
-    task = asyncio.create_task(run_order_simulation(order_id))
-    active_simulations[order_id] = task
-
-def get_status_description(status: str) -> str:
-    descriptions = {
-        'Pending': 'Awaiting restaurant approval.',
-        'Accepted': 'Restaurant accepted your order.',
-        'Preparing': 'Our chef is preparing your meal.',
-        'Ready': 'Order packed and ready for delivery partner pickup.',
-        'Picked Up': 'Delivery partner picked up your package.',
-        'Out for Delivery': 'Rider is on the way to your address.',
-        'Delivered': 'Your order has been delivered. Enjoy your meal!'
-    }
-    return descriptions.get(status, 'Processing your order.')
-
-# Template Compilation
-def compile_template(template: str, vars: dict) -> str:
-    compiled = template
-    mapping = {
-        "CustomerName": vars.get("customerName", "Customer"),
-        "OrderID": vars.get("orderId", ""),
-        "Items": vars.get("items", ""),
-        "Amount": vars.get("amount", "0.00"),
-        "Address": vars.get("address", ""),
-        "CompanyName": vars.get("companyName", "Delivo Cafe"),
-        "SupportNumber": vars.get("supportNumber", "+1 555-0100")
-    }
-    for key, val in mapping.items():
-        compiled = compiled.replace(f"{{{{{key}}}}}", str(val))
-        compiled = compiled.replace(f"{{{{ {key} }}}}", str(val))
-    return compiled
-
-# Messaging Engine Simulator
-async def send_provider_message(channel: str, provider: str, customer_phone: str, attempt: int) -> dict:
-    print(f"[Notification Engine] Dispatching via {channel.upper()} ({provider}) to {customer_phone} (Retry: {attempt})")
-    is_failure = False
-    reason = "Simulated delivery success"
-
-    if channel == "whatsapp":
-        if customer_phone.endswith("9") or customer_phone.endswith("8"):
-            is_failure = True
-            reason = "Provider error code 500: Gateway Timeout"
-    elif channel == "sms":
-        if customer_phone.endswith("8"):
-            is_failure = True
-            reason = "Carrier error code 30008: Destination unreachable"
-
-    await asyncio.sleep(0.8)
-    timestamp = datetime.now().isoformat()
-
-    if is_failure:
-        print(f"[Notification Engine] ❌ Message delivery failed on {channel}: {reason}")
-        return {
-            "success": False,
-            "status": "failed",
-            "sent_at": timestamp,
-            "provider_response": reason
-        }
-    print(f"[Notification Engine] ✅ Message delivered on {channel} successfully.")
-    return {
-        "success": True,
-        "status": "delivered",
-        "sent_at": timestamp,
-        "delivered_at": timestamp,
-        "provider_response": "OK: Message Queued & Delivered"
-    }
-
-async def queue_notification(order_id: str, type: str, custom_data: dict = None):
-    if custom_data is None:
-        custom_data = {}
-    db = load_db()
-    order = next((o for o in db.get("orders", []) if o["id"] == order_id), None)
-    if not order:
-        print(f"[Notification Queue] Order not found: {order_id}")
-        return
-
-    settings = db.get("communicationSettings", {})
-    customer_phone = order["customerPhone"]
-    customer_name = order["customerName"]
-
-    items_string = ", ".join([f"{it['quantity']}x {it['name']}" for it in order["items"]])
-    template_vars = {
-        "customerName": customer_name,
-        "orderId": order["id"].split("-")[1] if "-" in order["id"] else order["id"],
-        "items": items_string,
-        "amount": f"{order['total']:.2f}",
-        "address": order["address"],
-        **custom_data
-    }
-
-    templates = settings.get("templates", {})
-    template_text = templates.get(type, "")
-    message_text = compile_template(template_text, template_vars)
-
-    db.setdefault("notifications", [])
-    db.setdefault("conversations", [])
-
-    current_channel = "whatsapp" if settings.get("enableWhatsapp", True) else "sms"
-    provider = settings.get("whatsappProvider", "meta") if current_channel == "whatsapp" else settings.get("smsProvider", "twilio")
-    status = "failed"
-    response_data = None
-    attempt = 0
-    max_retries = settings.get("retryCount", 3)
-
-    if current_channel == "whatsapp":
-        while attempt <= max_retries:
-            notif_id = f"notif-{int(time.time() * 1000)}-{random.randint(0, 999)}"
-            new_notif = {
-                "id": notif_id,
-                "order_id": order_id,
-                "provider": provider,
-                "type": type,
-                "status": "sent",
-                "message": message_text,
-                "sent_at": datetime.now().isoformat(),
-                "delivered_at": None,
-                "read_at": None,
-                "reply_at": None,
-                "retry_count": attempt,
-                "provider_response": "Sending...",
-                "created_at": datetime.now().isoformat()
-            }
-            db["notifications"].append(new_notif)
-            save_db(db)
-            await sio.emit("new_notification", new_notif)
-
-            response_data = await send_provider_message("whatsapp", provider, customer_phone, attempt)
-
-            # Update DB notification
-            db = load_db()
-            for n in db.get("notifications", []):
-                if n["id"] == notif_id:
-                    n["status"] = response_data["status"]
-                    n["delivered_at"] = response_data.get("delivered_at")
-                    n["provider_response"] = response_data["provider_response"]
-                    if response_data["success"]:
-                        n["read_at"] = (datetime.now() + timedelta(seconds=1.5)).isoformat()
-                    break
-            save_db(db)
-            
-            # Emit updated notification
-            updated_notif = next((n for n in db.get("notifications", []) if n["id"] == notif_id), new_notif)
-            await sio.emit("new_notification", updated_notif)
-
-            # Log conversation
-            conv_id = f"conv-{int(time.time() * 1000)}-{random.randint(0, 999)}"
-            out_message = {
-                "id": conv_id,
-                "order_id": order_id,
-                "customer_number": customer_phone,
-                "message": message_text,
-                "direction": "outgoing",
-                "provider": "whatsapp",
-                "timestamp": datetime.now().isoformat()
-            }
-            db["conversations"].append(out_message)
-            save_db(db)
-            await sio.emit("new_chat", out_message)
-
-            # Timeline update
-            db = load_db()
-            for o in db.get("orders", []):
-                if o["id"] == order_id:
-                    o["timeline"].append({
-                        "status": "WhatsApp Sent",
-                        "timestamp": datetime.now().isoformat(),
-                        "title": f"WhatsApp Confirmation {'Retry ' + str(attempt) if attempt > 0 else 'Sent'}",
-                        "description": "Message delivered successfully to customer's WhatsApp." if response_data["success"] else f"Delivery failed: {response_data['provider_response']}"
-                    })
-                    await sio.emit("order_status", { "status": o["status"], "timeline": o["timeline"] }, room=order_id)
-                    await sio.emit("order_confirmation_updated", o)
-                    break
-            save_db(db)
-
-            if response_data["success"]:
-                status = "delivered"
-                break
-            attempt += 1
-
-        if status == "failed" and settings.get("enableSms", True):
-            print("[Notification Engine] ⚠️ WhatsApp failed. Cascading fallback to SMS...")
-            current_channel = "sms"
-            provider = settings.get("smsProvider", "twilio")
-            attempt = 0
-
-    if current_channel == "sms":
-        while attempt <= max_retries:
-            notif_id = f"notif-{int(time.time() * 1000)}-{random.randint(0, 999)}"
-            sms_text = f"Your Order #{order_id.split('-')[1] if '-' in order_id else order_id} is waiting for confirmation. Reply YES to Confirm, Reply NO to Cancel."
-            new_notif = {
-                "id": notif_id,
-                "order_id": order_id,
-                "provider": provider,
-                "type": type,
-                "status": "sent",
-                "message": sms_text,
-                "sent_at": datetime.now().isoformat(),
-                "delivered_at": None,
-                "read_at": None,
-                "reply_at": None,
-                "retry_count": attempt,
-                "provider_response": "Sending...",
-                "created_at": datetime.now().isoformat()
-            }
-            db = load_db()
-            db.setdefault("notifications", []).append(new_notif)
-            save_db(db)
-            await sio.emit("new_notification", new_notif)
-
-            response_data = await send_provider_message("sms", provider, customer_phone, attempt)
-
-            db = load_db()
-            for n in db.get("notifications", []):
-                if n["id"] == notif_id:
-                    n["status"] = response_data["status"]
-                    n["delivered_at"] = response_data.get("delivered_at")
-                    n["provider_response"] = response_data["provider_response"]
-                    break
-            save_db(db)
-            
-            updated_notif = next((n for n in db.get("notifications", []) if n["id"] == notif_id), new_notif)
-            await sio.emit("new_notification", updated_notif)
-
-            # Log conversation
-            conv_id = f"conv-{int(time.time() * 1000)}-{random.randint(0, 999)}"
-            out_message = {
-                "id": conv_id,
-                "order_id": order_id,
-                "customer_number": customer_phone,
-                "message": sms_text,
-                "direction": "outgoing",
-                "provider": "sms",
-                "timestamp": datetime.now().isoformat()
-            }
-            db["conversations"].append(out_message)
-            save_db(db)
-            await sio.emit("new_chat", out_message)
-
-            # Timeline
-            db = load_db()
-            for o in db.get("orders", []):
-                if o["id"] == order_id:
-                    o["timeline"].append({
-                        "status": "SMS Sent",
-                        "timestamp": datetime.now().isoformat(),
-                        "title": f"SMS Confirmation {'Retry ' + str(attempt) if attempt > 0 else 'Sent'}",
-                        "description": "SMS delivered successfully to customer's mobile number." if response_data["success"] else f"SMS Delivery failed: {response_data['provider_response']}"
-                    })
-                    await sio.emit("order_status", { "status": o["status"], "timeline": o["timeline"] }, room=order_id)
-                    await sio.emit("order_confirmation_updated", o)
-                    break
-            save_db(db)
-
-            if response_data["success"]:
-                status = "delivered"
-                break
-            attempt += 1
-
-    if status == "failed":
-        print(f"[Notification Engine] 🚨 Critical: WhatsApp and SMS both failed for Order #{order_id}")
-        alert_notif = {
-            "id": f"alert-{int(time.time() * 1000)}",
-            "title": "Confirmation Delivery Failure",
-            "description": f"Unable to reach {customer_name} ({customer_phone}) for Order #{order_id.split('-')[1] if '-' in order_id else order_id}. All channels failed.",
-            "type": "system",
-            "timestamp": datetime.now().isoformat(),
-            "read": False
-        }
-        db = load_db()
-        db.setdefault("notifications", []).append(alert_notif)
-        
-        for o in db.get("orders", []):
-            if o["id"] == order_id:
-                o["timeline"].append({
-                    "status": "Delivery Failed",
-                    "timestamp": datetime.now().isoformat(),
-                    "title": "Communication Channels Blocked",
-                    "description": "Both WhatsApp and SMS carriers rejected delivery attempts. Admin intervention required."
-                })
-                await sio.emit("order_status", { "status": o["status"], "timeline": o["timeline"] }, room=order_id)
-                await sio.emit("order_confirmation_updated", o)
-                break
-        save_db(db)
-        await sio.emit("new_notification", alert_notif)
-
-# Background Scheduler Check
-async def run_schedule_check():
-    db = load_db()
-    orders = db.get("orders", [])
-    if not orders:
-        return
-
-    now = datetime.now()
-    updated = False
-
-    for order in orders:
-        if order.get("confirmation_status") != "Pending":
-            continue
-
-        req_at_str = order.get("confirmation_requested_at")
-        if not req_at_str:
-            continue
-
-        try:
-            requested_at = datetime.fromisoformat(req_at_str)
-        except ValueError:
-            continue
-
-        elapsed_hours = (now - requested_at).total_seconds() / 3600.0
-
-        # Count reminders
-        reminder_count = len([
-            n for n in db.get("notifications", [])
-            if n.get("order_id") == order["id"] and n.get("type") == "reminder" and n.get("status") != "failed"
-        ])
-
-        # Check Expiry
-        settings = db.get("communicationSettings", {})
-        expiry_hours = settings.get("confirmationExpiry", 24)
-        if elapsed_hours >= expiry_hours:
-            print(f"[Scheduler] Order {order['id']} expired after {elapsed_hours:.2f} hours")
-            order["confirmation_status"] = "Expired"
-            order["status"] = "Cancelled"
-            order["cancelled_at"] = now.isoformat()
-            order["timeline"].append({
-                "status": "Confirmation Expired",
-                "timestamp": now.isoformat(),
-                "title": "Confirmation Expired",
-                "description": f"Customer failed to confirm order within {expiry_hours} hours."
-            })
-
-            alert_notif = {
-                "id": f"alert-{int(time.time() * 1000)}",
-                "title": "Order Confirmation Expired",
-                "description": f"Order #{order['id'].split('-')[1]} confirmation expired after {expiry_hours} hours. Status changed to Cancelled.",
-                "type": "system",
-                "timestamp": now.isoformat(),
-                "read": False
-            }
-            db.setdefault("notifications", []).append(alert_notif)
-            updated = True
-
-            await sio.emit("new_notification", alert_notif)
-            await sio.emit("order_status", { "status": order["status"], "timeline": order["timeline"] }, room=order["id"])
-            await sio.emit("order_confirmation_updated", order)
-            continue
-
-        # Check Reminder 2
-        if elapsed_hours >= 6 and reminder_count < 2:
-            print(f"[Scheduler] Dispatching Reminder 2 for Order {order['id']}")
-            updated = True
-            asyncio.create_task(queue_notification(order["id"], "reminder", {"messageLabel": "Second Reminder"}))
-
-        # Check Reminder 1
-        elif elapsed_hours >= 2 and reminder_count < 1:
-            print(f"[Scheduler] Dispatching Reminder 1 for Order {order['id']}")
-            updated = True
-            asyncio.create_task(queue_notification(order["id"], "reminder", {"messageLabel": "First Reminder"}))
-
-    if updated:
-        save_db(db)
-
+# Background Scheduler Monitor Loop
 async def scheduler_loop():
-    print("[Scheduler] Background Order Confirmation Monitor initialized.")
+    logger.info("[Scheduler] Asynchronous Order Confirmation Monitor started.")
     while True:
         try:
-            await run_schedule_check()
+            await NotificationService.run_schedule_check()
         except Exception as e:
-            print(f"[Scheduler] Loop error: {e}")
+            logger.error(f"[Scheduler] Loop error: {e}")
         await asyncio.sleep(10)
 
 @app.on_event("startup")
 async def startup_event():
-    load_db()
+    await Database.connect()
+    await seed_database()
     asyncio.create_task(scheduler_loop())
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    await Database.close()
 
 # REST API Endpoints
 @app.get("/api/db")
-def get_db():
-    return load_db()
+async def get_db_endpoint():
+    return await load_db_async()
 
 @app.get("/api/products")
-def get_products():
-    db = load_db()
-    return db.get("products", [])
+async def get_products_endpoint():
+    products = await ProductRepository.get_all()
+    for p in products:
+        p["_id"] = str(p["_id"])
+    return products
 
 @app.get("/api/banners")
-def get_banners():
-    db = load_db()
-    return db.get("banners", [])
+async def get_banners_endpoint():
+    banners = await OfferRepository.get_all()
+    for b in banners:
+        b["_id"] = str(b["_id"])
+    return banners
 
 @app.get("/api/coupons")
-def get_coupons():
-    db = load_db()
-    return [c for c in db.get("coupons", []) if c.get("status") == "Active"]
+async def get_coupons_endpoint():
+    coupons = await CouponRepository.get_all({"status": "Active"})
+    for c in coupons:
+        c["_id"] = str(c["_id"])
+    return coupons
 
 @app.get("/api/categories")
-def get_categories():
-    db = load_db()
-    products = db.get("products", [])
+async def get_categories_endpoint():
+    products = await ProductRepository.get_all()
     cat_names = sorted(list(set(p["category"] for p in products)))
     categories = []
     for idx, name in enumerate(cat_names):
@@ -724,7 +372,7 @@ def get_categories():
         })
     return categories
 
-# Auth Models & Routes
+# Authentication Payloads
 class LoginPayload(BaseModel):
     email: Optional[str] = None
     phone: Optional[str] = None
@@ -741,13 +389,12 @@ class OtpPayload(BaseModel):
     code: str
 
 @app.post("/api/auth/login")
-def login(payload: LoginPayload):
-    db = load_db()
+async def login_endpoint(payload: LoginPayload):
     customer = None
-    for c in db.get("customers", []):
-        if (payload.email and c.get("email") == payload.email) or (payload.phone and c.get("phone") == payload.phone):
-            customer = c
-            break
+    if payload.email:
+        customer = await CustomerRepository.get_by_email(payload.email)
+    elif payload.phone:
+        customer = await CustomerRepository.get_by_phone(payload.phone)
 
     if not customer:
         customer = {
@@ -760,10 +407,15 @@ def login(payload: LoginPayload):
             "rewardPoints": 200,
             "status": "Active",
             "addresses": [],
-            "favoriteItems": []
+            "favoriteItems": [],
+            "is_deleted": False,
+            "created_at": datetime.now(),
+            "updated_at": datetime.now()
         }
-        db.setdefault("customers", []).append(customer)
-        save_db(db)
+        await CustomerRepository.create(customer)
+    
+    if "_id" in customer:
+        customer["_id"] = str(customer["_id"])
 
     return {
         "success": True,
@@ -772,11 +424,11 @@ def login(payload: LoginPayload):
     }
 
 @app.post("/api/auth/register")
-def register(payload: RegisterPayload):
-    db = load_db()
-    for c in db.get("customers", []):
-        if c.get("email") == payload.email or c.get("phone") == payload.phone:
-            raise HTTPException(status_code=400, detail="User already exists with this email or phone number.")
+async def register_endpoint(payload: RegisterPayload):
+    c_email = await CustomerRepository.get_by_email(payload.email)
+    c_phone = await CustomerRepository.get_by_phone(payload.phone)
+    if c_email or c_phone:
+        raise HTTPException(status_code=400, detail="User already exists with this email or phone number.")
 
     customer = {
         "id": f"cust-{int(time.time() * 1000)}",
@@ -788,11 +440,13 @@ def register(payload: RegisterPayload):
         "rewardPoints": 100,
         "status": "Active",
         "addresses": [],
-        "favoriteItems": []
+        "favoriteItems": [],
+        "is_deleted": False,
+        "created_at": datetime.now(),
+        "updated_at": datetime.now()
     }
-    db.setdefault("customers", []).append(customer)
-    save_db(db)
-
+    await CustomerRepository.create(customer)
+    customer["_id"] = str(customer["_id"])
     return {
         "success": True,
         "token": "jwt-mock-token-xyz-12345",
@@ -800,17 +454,11 @@ def register(payload: RegisterPayload):
     }
 
 @app.post("/api/auth/verify-otp")
-def verify_otp(payload: OtpPayload):
+async def verify_otp_endpoint(payload: OtpPayload):
     if not payload.code or len(payload.code) != 6:
         raise HTTPException(status_code=400, detail="Invalid OTP format. Must be 6 digits.")
 
-    db = load_db()
-    customer = None
-    for c in db.get("customers", []):
-        if c.get("phone") == payload.phone:
-            customer = c
-            break
-
+    customer = await CustomerRepository.get_by_phone(payload.phone)
     if not customer:
         customer = {
             "id": f"cust-{int(time.time() * 1000)}",
@@ -822,10 +470,15 @@ def verify_otp(payload: OtpPayload):
             "rewardPoints": 100,
             "status": "Active",
             "addresses": [],
-            "favoriteItems": []
+            "favoriteItems": [],
+            "is_deleted": False,
+            "created_at": datetime.now(),
+            "updated_at": datetime.now()
         }
-        db.setdefault("customers", []).append(customer)
-        save_db(db)
+        await CustomerRepository.create(customer)
+
+    if "_id" in customer:
+        customer["_id"] = str(customer["_id"])
 
     return {
         "success": True,
@@ -834,14 +487,14 @@ def verify_otp(payload: OtpPayload):
     }
 
 @app.get("/api/auth/profile")
-def get_profile():
-    db = load_db()
-    customers = db.get("customers", [])
+async def get_profile_endpoint():
+    customers = await CustomerRepository.get_all()
     if customers:
+        customers[0]["_id"] = str(customers[0]["_id"])
         return customers[0]
     return {}
 
-# Order Management endpoints
+# Order Status and Assignment Payloads
 class OrderStatusUpdate(BaseModel):
     status: str
     updatedBy: str
@@ -851,48 +504,77 @@ class RiderAssign(BaseModel):
     updatedBy: str
 
 @app.post("/api/orders/{order_id}/status")
-async def update_order_status(order_id: str, payload: OrderStatusUpdate):
-    db = load_db()
-    order = next((o for o in db.get("orders", []) if o["id"] == order_id), None)
-    if order:
-        order["status"] = payload.status
-        order["timeline"].append({
-            "status": payload.status,
-            "timestamp": datetime.now().isoformat(),
-            "title": f"Status Updated to {payload.status}",
-            "description": f"Order status set by {payload.updatedBy}."
-        })
-        if payload.status == "Delivered":
-            order["paymentStatus"] = "Paid"
-        elif payload.status == "Cancelled":
-            order["paymentStatus"] = "Refunded"
+async def update_order_status_endpoint(order_id: str, payload: OrderStatusUpdate):
+    order = await OrderRepository.get_by_id(order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
 
-        save_db(db)
-        await sio.emit("order_status", { "status": payload.status, "timeline": order["timeline"] }, room=order_id)
-        return {"success": True, "order": order}
-    raise HTTPException(status_code=404, detail="Order not found")
+    timeline_event = {
+        "status": payload.status,
+        "timestamp": datetime.now().isoformat(),
+        "title": f"Status Updated to {payload.status}",
+        "description": f"Order status set by {payload.updatedBy}."
+    }
+    
+    update_fields = {"status": payload.status, "updated_at": datetime.now()}
+    if payload.status == "Delivered":
+        update_fields["paymentStatus"] = "Paid"
+    elif payload.status == "Cancelled":
+        update_fields["paymentStatus"] = "Refunded"
+
+    await OrderRepository.update(order_id, update_fields)
+    await OrderRepository.add_timeline_event(order_id, timeline_event)
+
+    updated_order = await OrderRepository.get_by_id(order_id)
+    updated_order["_id"] = str(updated_order["_id"])
+
+    # Broadcast updates via socket
+    await sio.emit("order_status", { "status": payload.status, "timeline": updated_order["timeline"] }, room=order_id)
+    await sio.emit("order_confirmation_updated", updated_order)
+
+    # Deliver SMS notification cascades
+    try:
+        settings_doc = await Database.db.settings.find_one({"is_deleted": False})
+        await NotificationService.trigger_delivery_update_flow(updated_order, settings_doc or {}, payload.status)
+    except Exception as e:
+        logger.error(f"Failed to trigger status update outbox log: {e}")
+
+    return {"success": True, "order": updated_order}
 
 @app.post("/api/orders/{order_id}/assign-rider")
-async def assign_rider(order_id: str, payload: RiderAssign):
-    db = load_db()
-    order = next((o for o in db.get("orders", []) if o["id"] == order_id), None)
-    rider = next((r for r in db.get("deliveryPartners", []) if r["id"] == payload.riderId), None)
+async def assign_rider_endpoint(order_id: str, payload: RiderAssign):
+    order = await OrderRepository.get_by_id(order_id)
+    rider = await DeliveryPartnerRepository.get_by_id(payload.riderId)
 
     if order and rider:
-        order["deliveryPartnerId"] = payload.riderId
-        order["status"] = "Out for Delivery"
-        order["timeline"].append({
+        await OrderRepository.update(order_id, {
+            "deliveryPartnerId": payload.riderId,
+            "status": "Out for Delivery",
+            "updated_at": datetime.now()
+        })
+        
+        timeline_event = {
             "status": "Out for Delivery",
             "timestamp": datetime.now().isoformat(),
             "title": "Dispatched with Rider",
             "description": f"Assigned to rider {rider['name']} by {payload.updatedBy}."
-        })
-        rider["status"] = "On Delivery"
-        rider["assignedOrderId"] = order_id
-        save_db(db)
+        }
+        await OrderRepository.add_timeline_event(order_id, timeline_event)
+        
+        # Update rider status
+        await DeliveryPartnerRepository.assign_order(payload.riderId, order_id)
 
-        await sio.emit("order_status", { "status": "Out for Delivery", "timeline": order["timeline"] }, room=order_id)
-        return {"success": True, "order": order, "rider": rider}
+        updated_order = await OrderRepository.get_by_id(order_id)
+        updated_order["_id"] = str(updated_order["_id"])
+        
+        # Broadcast tracking updates
+        await sio.emit("order_status", { "status": "Out for Delivery", "timeline": updated_order["timeline"] }, room=order_id)
+        await sio.emit("order_confirmation_updated", updated_order)
+
+        # Start coordinates stream simulation
+        DeliveryService.start_simulation(order_id)
+
+        return {"success": True, "order": updated_order, "rider": rider}
     raise HTTPException(status_code=404, detail="Order or Rider not found")
 
 # Chatbot endpoint
@@ -908,7 +590,7 @@ class ChatRequest(BaseModel):
 async def chat_endpoint(payload: ChatRequest):
     try:
         from chatbot import answer_chat
-        db = load_db()
+        db = await load_db_async()
         result = await answer_chat(
             message=payload.message,
             history=[h.model_dump() for h in payload.history] if payload.history else [],
@@ -920,7 +602,7 @@ async def chat_endpoint(payload: ChatRequest):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
-# Customer Management
+# Customer Management Endpoints
 class StatusUpdate(BaseModel):
     status: str
 
@@ -931,68 +613,67 @@ class AddressesUpdate(BaseModel):
     addresses: List[str]
 
 @app.post("/api/customers/{customer_id}/status")
-def update_customer_status(customer_id: str, payload: StatusUpdate):
-    db = load_db()
-    for c in db.get("customers", []):
-        if c["id"] == customer_id:
-            c["status"] = payload.status
-            save_db(db)
-            return {"success": True, "customer": c}
+async def update_customer_status_endpoint(customer_id: str, payload: StatusUpdate):
+    success = await CustomerRepository.update(customer_id, {"status": payload.status, "updated_at": datetime.now()})
+    if success:
+        c = await CustomerRepository.get_by_id(customer_id)
+        c["_id"] = str(c["_id"])
+        return {"success": True, "customer": c}
     raise HTTPException(status_code=404, detail="Customer not found")
 
 @app.post("/api/customers/{customer_id}/wallet")
-def update_customer_wallet(customer_id: str, payload: WalletUpdate):
-    db = load_db()
-    for c in db.get("customers", []):
-        if c["id"] == customer_id:
-            c["walletBalance"] += payload.amount
-            save_db(db)
-            return {"success": True, "customer": c}
+async def update_customer_wallet_endpoint(customer_id: str, payload: WalletUpdate):
+    success = await CustomerRepository.update_wallet(customer_id, payload.amount)
+    if success:
+        c = await CustomerRepository.get_by_id(customer_id)
+        c["_id"] = str(c["_id"])
+        return {"success": True, "customer": c}
     raise HTTPException(status_code=404, detail="Customer not found")
 
 @app.post("/api/customers/{customer_id}/addresses")
-def update_customer_addresses(customer_id: str, payload: AddressesUpdate):
-    db = load_db()
-    for c in db.get("customers", []):
-        if c["id"] == customer_id:
-            c["addresses"] = payload.addresses
-            save_db(db)
-            return {"success": True, "customer": c}
+async def update_customer_addresses_endpoint(customer_id: str, payload: AddressesUpdate):
+    success = await CustomerRepository.update(customer_id, {"addresses": payload.addresses, "updated_at": datetime.now()})
+    if success:
+        c = await CustomerRepository.get_by_id(customer_id)
+        c["_id"] = str(c["_id"])
+        return {"success": True, "customer": c}
     raise HTTPException(status_code=404, detail="Customer not found")
 
 @app.post("/api/coupons/{coupon_id}/toggle")
-def toggle_coupon(coupon_id: str):
-    db = load_db()
-    for c in db.get("coupons", []):
-        if c["id"] == coupon_id:
-            c["status"] = "Paused" if c["status"] == "Active" else "Active"
-            save_db(db)
-            return {"success": True, "coupon": c}
+async def toggle_coupon_endpoint(coupon_id: str):
+    coupon = await CouponRepository.get_by_id(coupon_id)
+    if coupon:
+        next_status = "Paused" if coupon["status"] == "Active" else "Active"
+        await CouponRepository.update(coupon_id, {"status": next_status, "updated_at": datetime.now()})
+        coupon = await CouponRepository.get_by_id(coupon_id)
+        coupon["_id"] = str(coupon["_id"])
+        return {"success": True, "coupon": coupon}
     raise HTTPException(status_code=404, detail="Coupon not found")
 
 @app.post("/api/banners/{banner_id}/status")
-def update_banner_status(banner_id: str, payload: StatusUpdate):
-    db = load_db()
-    for b in db.get("banners", []):
-        if b["id"] == banner_id:
-            b["status"] = payload.status
-            save_db(db)
-            return {"success": True, "banner": b}
+async def update_banner_status_endpoint(banner_id: str, payload: StatusUpdate):
+    success = await OfferRepository.update(banner_id, {"status": payload.status, "updated_at": datetime.now()})
+    if success:
+        banner = await OfferRepository.get_by_id(banner_id)
+        banner["_id"] = str(banner["_id"])
+        return {"success": True, "banner": banner}
     raise HTTPException(status_code=404, detail="Banner not found")
 
 @app.post("/api/audit-logs")
-def add_audit_log(payload: dict):
-    db = load_db()
+async def add_audit_log_endpoint(payload: dict):
     log = {
         "id": f"log-{int(time.time() * 1000)}",
         "timestamp": datetime.now().isoformat(),
+        "is_deleted": False,
+        "created_at": datetime.now(),
+        "updated_at": datetime.now(),
         **payload
     }
-    db.setdefault("auditLogs", []).insert(0, log)
-    save_db(db)
+    await Database.db.audit_logs.insert_one(log)
+    log["_id"] = str(log["_id"])
     return {"success": True, "log": log}
 
-# Create Order
+# Create Order Payload and endpoint
 class OrderItemPayload(BaseModel):
     productId: str
     name: str
@@ -1018,15 +699,16 @@ class NewOrderPayload(BaseModel):
     orderType: str
 
 @app.post("/api/orders")
-async def create_order(payload: NewOrderPayload):
-    db = load_db()
-    settings = db.get("communicationSettings", {})
+async def create_order_endpoint(payload: NewOrderPayload):
+    settings_doc = await Database.db.settings.find_one({"is_deleted": False})
+    settings = settings_doc if settings_doc else {}
+
     is_conf_enabled = settings.get("enableWhatsapp", True) or settings.get("enableSms", True)
     now = datetime.now()
     expiry_hours = settings.get("confirmationExpiry", 24)
 
     order_id = f"order-{str(int(time.time()))[-4:]}"
-
+    
     new_order = {
         "id": order_id,
         "createdAt": now.isoformat(),
@@ -1039,13 +721,31 @@ async def create_order(payload: NewOrderPayload):
                 "description": "Your order was successfully submitted."
             }
         ],
-        **payload.model_dump(),
-        "confirmation_status": "Pending" if is_conf_enabled else None,
+        "customerId": payload.customerId,
+        "customerName": payload.customerName,
+        "customerPhone": payload.customerPhone,
+        "outletId": payload.outletId,
+        "outletName": payload.outletName,
+        "items": [it.model_dump() for it in payload.items],
+        "subtotal": payload.subtotal,
+        "tax": payload.tax,
+        "deliveryCharge": payload.deliveryCharge,
+        "packagingCharge": payload.packagingCharge,
+        "discount": payload.discount,
+        "total": payload.total,
+        "paymentMethod": payload.paymentMethod,
+        "address": payload.address,
+        "orderType": payload.orderType,
+        "paymentStatus": "Paid" if payload.paymentMethod == "Wallet" else "Pending",
+        "confirmation_status": "Pending" if is_conf_enabled else "Confirmed",
         "confirmation_source": None,
         "confirmation_requested_at": now.isoformat() if is_conf_enabled else None,
         "confirmation_token": f"token_{random.randint(100000000, 999999999)}" if is_conf_enabled else None,
         "confirmation_expiry": (now + timedelta(hours=expiry_hours)).isoformat() if is_conf_enabled else None,
-        "customer_reply": None
+        "customer_reply": None,
+        "is_deleted": False,
+        "created_at": datetime.now(),
+        "updated_at": datetime.now()
     }
 
     if is_conf_enabled:
@@ -1056,26 +756,23 @@ async def create_order(payload: NewOrderPayload):
             "description": "System is initiating multi-channel dispatch."
         })
 
-    db.setdefault("orders", []).insert(0, new_order)
+    await OrderRepository.create(new_order)
 
     # Adjust customer details
-    for c in db.get("customers", []):
-        if c["id"] == payload.customerId:
-            if payload.paymentMethod == "Wallet":
-                c["walletBalance"] = max(0.0, c["walletBalance"] - payload.total)
-            c["rewardPoints"] += round(payload.subtotal)
-            break
+    if payload.paymentMethod == "Wallet":
+        await CustomerRepository.update_wallet(payload.customerId, -payload.total)
+    await CustomerRepository.update(payload.customerId, {"rewardPoints": round(payload.subtotal), "updated_at": datetime.now()})
 
-    save_db(db)
+    new_order["_id"] = str(new_order["_id"])
 
     if is_conf_enabled:
-        asyncio.create_task(queue_notification(order_id, "confirmation"))
+        asyncio.create_task(NotificationService.queue_notification(order_id, "confirmation"))
     else:
-        start_order_simulation(order_id)
+        # Start simulator directly if confirmation is disabled
+        DeliveryService.start_simulation(order_id)
 
     return {"success": True, "order": new_order}
 
-# Order Confirmation Center Routes
 class OrderIdPayload(BaseModel):
     orderId: str
 
@@ -1088,362 +785,186 @@ class SimulateTimeLeapPayload(BaseModel):
     hours: float
 
 @app.post("/api/orders/send-confirmation")
-async def send_confirmation(payload: OrderIdPayload):
-    db = load_db()
-    order = next((o for o in db.get("orders", []) if o["id"] == payload.orderId), None)
+async def send_confirmation_endpoint(payload: OrderIdPayload):
+    order = await OrderRepository.get_by_id(payload.orderId)
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 
-    settings = db.get("communicationSettings", {})
+    settings_doc = await Database.db.settings.find_one({"is_deleted": False})
+    settings = settings_doc if settings_doc else {}
     expiry_hours = settings.get("confirmationExpiry", 24)
     now = datetime.now()
 
-    order["confirmation_status"] = "Pending"
-    order["confirmation_source"] = None
-    order["confirmation_requested_at"] = now.isoformat()
-    order["confirmation_token"] = f"token_{random.randint(100000000, 999999999)}"
-    order["confirmation_expiry"] = (now + timedelta(hours=expiry_hours)).isoformat()
-    order["customer_reply"] = None
-
-    order["timeline"].append({
+    update_fields = {
+        "confirmation_status": "Pending",
+        "confirmation_source": None,
+        "confirmation_requested_at": now.isoformat(),
+        "confirmation_token": f"token_{random.randint(100000000, 999999999)}",
+        "confirmation_expiry": (now + timedelta(hours=expiry_hours)).isoformat(),
+        "customer_reply": None,
+        "updated_at": datetime.now()
+    }
+    await OrderRepository.update(payload.orderId, update_fields)
+    
+    timeline_event = {
         "status": "Pending Confirmation",
         "timestamp": now.isoformat(),
         "title": "Confirmation Workflow Triggered",
         "description": "System is initiating multi-channel dispatch."
-    })
-    save_db(db)
+    }
+    await OrderRepository.add_timeline_event(payload.orderId, timeline_event)
 
-    await sio.emit("order_status", { "status": order["status"], "timeline": order["timeline"] }, room=payload.orderId)
-    await sio.emit("order_confirmation_updated", order)
+    updated_order = await OrderRepository.get_by_id(payload.orderId)
+    updated_order["_id"] = str(updated_order["_id"])
 
-    asyncio.create_task(queue_notification(payload.orderId, "confirmation"))
-    return {"success": True, "order": order}
+    await sio.emit("order_status", { "status": updated_order["status"], "timeline": updated_order["timeline"] }, room=payload.orderId)
+    await sio.emit("order_confirmation_updated", updated_order)
 
-def normalize_phone(phone: str) -> str:
-    if not phone:
-        return ""
-    digits = "".join([c for c in phone if c.isdigit()])
-    return digits[-10:]
+    asyncio.create_task(NotificationService.queue_notification(payload.orderId, "confirmation"))
+    return {"success": True, "order": updated_order}
 
-# Webhooks Simulation
+# SMS Webhook Simulator
 class WebhookPayload(BaseModel):
     From: str
     Body: str
 
-@app.post("/api/webhook/whatsapp")
-async def webhook_whatsapp(payload: WebhookPayload):
-    phone = normalize_phone(payload.From)
-    text = (payload.Body or "").strip()
-    print(f"[Webhook WhatsApp] Incoming from normalize({payload.From}) -> {phone}: \"{text}\"")
-
-    db = load_db()
-    order = next((o for o in db.get("orders", []) if o.get("confirmation_status") == "Pending" and normalize_phone(o.get("customerPhone")) == phone), None)
-
-    if not order:
-        print(f"[Webhook WhatsApp] No pending order found for phone {phone}")
-        conv_id = f"conv-{int(time.time() * 1000)}"
-        in_message = {
-            "id": conv_id,
-            "order_id": "unknown",
-            "customer_number": payload.From,
-            "message": text,
-            "direction": "incoming",
-            "provider": "whatsapp",
-            "timestamp": datetime.now().isoformat()
-        }
-        db.setdefault("conversations", []).append(in_message)
-        save_db(db)
-        await sio.emit("new_chat", in_message)
-        return {"success": False, "message": "No active order found."}
-
-    conv_id = f"conv-{int(time.time() * 1000)}"
-    in_message = {
-        "id": conv_id,
-        "order_id": order["id"],
-        "customer_number": order["customerPhone"],
-        "message": text,
-        "direction": "incoming",
-        "provider": "whatsapp",
-        "timestamp": datetime.now().isoformat()
-    }
-    db.setdefault("conversations", []).append(in_message)
-    order["customer_reply"] = text
-    now = datetime.now()
-    clean_text = text.upper()
-
-    if "YES" in clean_text or "CONFIRM" in clean_text:
-        order["confirmation_status"] = "Confirmed"
-        order["confirmed_at"] = now.isoformat()
-        order["confirmation_source"] = "whatsapp"
-        order["status"] = "Preparing"
-        order["timeline"].append({
-            "status": "Confirmed",
-            "timestamp": now.isoformat(),
-            "title": "Order Confirmed via WhatsApp",
-            "description": f"Customer replied: \"{text}\"."
-        })
-        save_db(db)
-
-        start_order_simulation(order["id"])
-        asyncio.create_task(queue_notification(order["id"], "success"))
-
-        alert_notif = {
-            "id": f"alert-{int(time.time() * 1000)}",
-            "title": "Order Confirmed",
-            "description": f"Customer {order['customerName']} has confirmed Order #{order['id'].split('-')[1] if '-' in order['id'] else order['id']}.",
-            "type": "order",
-            "timestamp": now.isoformat(),
-            "read": False
-        }
-        db = load_db()
-        db.setdefault("notifications", []).append(alert_notif)
-        save_db(db)
-        await sio.emit("new_notification", alert_notif)
-
-    elif "NO" in clean_text or "CANCEL" in clean_text:
-        order["confirmation_status"] = "Cancelled"
-        order["cancelled_at"] = now.isoformat()
-        order["confirmation_source"] = "whatsapp"
-        order["status"] = "Cancelled"
-        order["timeline"].append({
-            "status": "Cancelled",
-            "timestamp": now.isoformat(),
-            "title": "Order Cancelled via WhatsApp",
-            "description": f"Customer replied: \"{text}\"."
-        })
-        save_db(db)
-
-        asyncio.create_task(queue_notification(order["id"], "cancellation"))
-
-        alert_notif = {
-            "id": f"alert-{int(time.time() * 1000)}",
-            "title": "Order Cancelled",
-            "description": f"Customer {order['customerName']} cancelled Order #{order['id'].split('-')[1] if '-' in order['id'] else order['id']}.",
-            "type": "order",
-            "timestamp": now.isoformat(),
-            "read": False
-        }
-        db = load_db()
-        db.setdefault("notifications", []).append(alert_notif)
-        save_db(db)
-        await sio.emit("new_notification", alert_notif)
-    else:
-        order["timeline"].append({
-            "status": "Awaiting Clarification",
-            "timestamp": now.isoformat(),
-            "title": "Unrecognized Message Received",
-            "description": f"Customer replied: \"{text}\". Expected YES or NO."
-        })
-        save_db(db)
-
-    # Reload database object to get all updates
-    db = load_db()
-    updated_order = next((o for o in db["orders"] if o["id"] == order["id"]), order)
-    await sio.emit("order_status", { "status": updated_order["status"], "timeline": updated_order["timeline"] }, room=order["id"])
-    await sio.emit("order_confirmation_updated", updated_order)
-    await sio.emit("new_chat", in_message)
-
-    return {"success": True}
-
 @app.post("/api/webhook/sms")
-async def webhook_sms(payload: WebhookPayload):
-    phone = normalize_phone(payload.From)
+async def webhook_sms_endpoint(payload: WebhookPayload):
+    phone = payload.From
     text = (payload.Body or "").strip()
-    print(f"[Webhook SMS] Incoming from normalize({payload.From}) -> {phone}: \"{text}\"")
+    logger.info(f"[Webhook SMS] Incoming message from {phone}: \"{text}\"")
 
-    db = load_db()
-    order = next((o for o in db.get("orders", []) if o.get("confirmation_status") == "Pending" and normalize_phone(o.get("customerPhone")) == phone), None)
+    # Match order by normalized customerPhone
+    db_orders = await OrderRepository.get_all({"confirmation_status": "Pending"})
+    matching_order = None
+    for order in db_orders:
+        if order.get("customerPhone") in phone or phone in order.get("customerPhone"):
+            matching_order = order
+            break
 
-    if not order:
+    if not matching_order:
         conv_id = f"conv-{int(time.time() * 1000)}"
         in_message = {
             "id": conv_id,
             "order_id": "unknown",
-            "customer_number": payload.From,
+            "customer_number": phone,
             "message": text,
             "direction": "incoming",
             "provider": "sms",
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
+            "is_deleted": False,
+            "created_at": datetime.now(),
+            "updated_at": datetime.now()
         }
-        db.setdefault("conversations", []).append(in_message)
-        save_db(db)
+        await Database.db.conversations.insert_one(in_message)
         await sio.emit("new_chat", in_message)
         return {"success": False, "message": "No active order found."}
 
+    order_id = matching_order["id"]
     conv_id = f"conv-{int(time.time() * 1000)}"
     in_message = {
         "id": conv_id,
-        "order_id": order["id"],
-        "customer_number": order["customerPhone"],
+        "order_id": order_id,
+        "customer_number": matching_order["customerPhone"],
         "message": text,
         "direction": "incoming",
         "provider": "sms",
-        "timestamp": datetime.now().isoformat()
+        "timestamp": datetime.now().isoformat(),
+        "is_deleted": False,
+        "created_at": datetime.now(),
+        "updated_at": datetime.now()
     }
-    db.setdefault("conversations", []).append(in_message)
-    order["customer_reply"] = text
-    now = datetime.now()
-    clean_text = text.upper()
-
-    if "YES" in clean_text or "CONFIRM" in clean_text:
-        order["confirmation_status"] = "Confirmed"
-        order["confirmed_at"] = now.isoformat()
-        order["confirmation_source"] = "sms"
-        order["status"] = "Preparing"
-        order["timeline"].append({
-            "status": "Confirmed",
-            "timestamp": now.isoformat(),
-            "title": "Order Confirmed via SMS",
-            "description": f"Customer replied: \"{text}\"."
-        })
-        save_db(db)
-
-        start_order_simulation(order["id"])
-        asyncio.create_task(queue_notification(order["id"], "success"))
-
-        alert_notif = {
-            "id": f"alert-{int(time.time() * 1000)}",
-            "title": "Order Confirmed",
-            "description": f"Customer {order['customerName']} has confirmed Order #{order['id'].split('-')[1] if '-' in order['id'] else order['id']}.",
-            "type": "order",
-            "timestamp": now.isoformat(),
-            "read": False
-        }
-        db = load_db()
-        db.setdefault("notifications", []).append(alert_notif)
-        save_db(db)
-        await sio.emit("new_notification", alert_notif)
-
-    elif "NO" in clean_text or "CANCEL" in clean_text:
-        order["confirmation_status"] = "Cancelled"
-        order["cancelled_at"] = now.isoformat()
-        order["confirmation_source"] = "sms"
-        order["status"] = "Cancelled"
-        order["timeline"].append({
-            "status": "Cancelled",
-            "timestamp": now.isoformat(),
-            "title": "Order Cancelled via SMS",
-            "description": f"Customer replied: \"{text}\"."
-        })
-        save_db(db)
-
-        asyncio.create_task(queue_notification(order["id"], "cancellation"))
-
-        alert_notif = {
-            "id": f"alert-{int(time.time() * 1000)}",
-            "title": "Order Cancelled",
-            "description": f"Customer {order['customerName']} cancelled Order #{order['id'].split('-')[1] if '-' in order['id'] else order['id']}.",
-            "type": "order",
-            "timestamp": now.isoformat(),
-            "read": False
-        }
-        db = load_db()
-        db.setdefault("notifications", []).append(alert_notif)
-        save_db(db)
-        await sio.emit("new_notification", alert_notif)
-    else:
-        order["timeline"].append({
-            "status": "Awaiting Clarification",
-            "timestamp": now.isoformat(),
-            "title": "Unrecognized Message Received",
-            "description": f"Customer replied: \"{text}\". Expected YES or NO."
-        })
-        save_db(db)
-
-    db = load_db()
-    updated_order = next((o for o in db["orders"] if o["id"] == order["id"]), order)
-    await sio.emit("order_status", { "status": updated_order["status"], "timeline": updated_order["timeline"] }, room=order["id"])
-    await sio.emit("order_confirmation_updated", updated_order)
+    await Database.db.conversations.insert_one(in_message)
     await sio.emit("new_chat", in_message)
 
+    await OrderRepository.update(order_id, {"customer_reply": text, "updated_at": datetime.now()})
+
+    settings_doc = await Database.db.settings.find_one({"is_deleted": False})
+    comm_settings = settings_doc or {}
+
+    clean_text = text.upper()
+    if any(k in clean_text for k in ["YES", "CONFIRM", "OK"]):
+        await OrderService.confirm_order(order_id, "sms", text, comm_settings)
+    elif any(k in clean_text for k in ["NO", "CANCEL", "REJECT"]):
+        await OrderService.cancel_order(order_id, "sms", text, comm_settings)
+    else:
+        timeline_event = {
+            "status": "Awaiting Clarification",
+            "timestamp": datetime.now().isoformat(),
+            "title": "Unrecognized Message Received",
+            "description": f"Customer replied: \"{text}\". Expected YES or NO."
+        }
+        await OrderRepository.add_timeline_event(order_id, timeline_event)
+
+    updated_order = await OrderRepository.get_by_id(order_id)
+    updated_order["_id"] = str(updated_order["_id"])
+    await sio.emit("order_status", { "status": updated_order["status"], "timeline": updated_order["timeline"] }, room=order_id)
+    await sio.emit("order_confirmation_updated", updated_order)
+    
     return {"success": True}
 
 @app.post("/api/orders/confirm")
-async def force_confirm(payload: OrderIdPayload):
-    db = load_db()
-    order = next((o for o in db.get("orders", []) if o["id"] == payload.orderId), None)
-    if not order:
-        raise HTTPException(status_code=404, detail="Order not found")
-
-    now = datetime.now()
-    order["confirmation_status"] = "Confirmed"
-    order["confirmed_at"] = now.isoformat()
-    order["confirmation_source"] = "admin"
-    order["status"] = "Preparing"
-    order["timeline"].append({
-        "status": "Confirmed",
-        "timestamp": now.isoformat(),
-        "title": "Force Confirmed by Admin",
-        "description": "Admin manually confirmed this order."
-    })
-    save_db(db)
-
-    start_order_simulation(payload.orderId)
-    await sio.emit("order_status", { "status": order["status"], "timeline": order["timeline"] }, room=payload.orderId)
-    await sio.emit("order_confirmation_updated", order)
-
-    return {"success": True, "order": order}
+async def force_confirm_endpoint(payload: OrderIdPayload):
+    settings_doc = await Database.db.settings.find_one({"is_deleted": False})
+    success = await OrderService.confirm_order(payload.orderId, "admin", "Forced Confirm by Administrator", settings_doc or {})
+    if success:
+        order = await OrderRepository.get_by_id(payload.orderId)
+        order["_id"] = str(order["_id"])
+        return {"success": True, "order": order}
+    raise HTTPException(status_code=400, detail="Failed to force confirm order.")
 
 class CancelPayload(BaseModel):
     orderId: str
     reason: Optional[str] = "Admin Cancelled"
 
 @app.post("/api/orders/cancel")
-async def force_cancel(payload: CancelPayload):
-    db = load_db()
-    order = next((o for o in db.get("orders", []) if o["id"] == payload.orderId), None)
-    if not order:
-        raise HTTPException(status_code=404, detail="Order not found")
-
-    now = datetime.now()
-    order["confirmation_status"] = "Cancelled"
-    order["cancelled_at"] = now.isoformat()
-    order["confirmation_source"] = "admin"
-    order["status"] = "Cancelled"
-    order["timeline"].append({
-        "status": "Cancelled",
-        "timestamp": now.isoformat(),
-        "title": "Force Cancelled by Admin",
-        "description": f"Admin manually cancelled this order. Reason: {payload.reason}"
-    })
-    save_db(db)
-
-    await sio.emit("order_status", { "status": order["status"], "timeline": order["timeline"] }, room=payload.orderId)
-    await sio.emit("order_confirmation_updated", order)
-
-    return {"success": True, "order": order}
+async def force_cancel_endpoint(payload: CancelPayload):
+    settings_doc = await Database.db.settings.find_one({"is_deleted": False})
+    success = await OrderService.cancel_order(payload.orderId, "admin", payload.reason, settings_doc or {})
+    if success:
+        order = await OrderRepository.get_by_id(payload.orderId)
+        order["_id"] = str(order["_id"])
+        return {"success": True, "order": order}
+    raise HTTPException(status_code=400, detail="Failed to force cancel order.")
 
 @app.get("/api/orders/confirmation-history")
-def get_confirmation_history():
-    db = load_db()
-    return [o for o in db.get("orders", []) if o.get("confirmation_requested_at") is not None]
+async def get_confirmation_history_endpoint():
+    orders = await OrderRepository.get_all({"confirmation_requested_at": {"$ne": None}})
+    for o in orders:
+        o["_id"] = str(o["_id"])
+    return orders
 
 @app.get("/api/orders/logs")
-def get_logs():
-    db = load_db()
-    return db.get("notifications", [])
+async def get_logs_endpoint():
+    notifs = await NotificationRepository.get_all()
+    for n in notifs:
+        n["_id"] = str(n["_id"])
+    return notifs
 
 @app.post("/api/orders/resend")
-async def resend_confirmation(payload: ResendPayload):
-    db = load_db()
-    order = next((o for o in db.get("orders", []) if o["id"] == payload.orderId), None)
+async def resend_confirmation_endpoint(payload: ResendPayload):
+    order = await OrderRepository.get_by_id(payload.orderId)
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 
-    order["timeline"].append({
+    timeline_event = {
         "status": "Resending",
         "timestamp": datetime.now().isoformat(),
         "title": f"Resend Requested ({payload.channel})",
         "description": "Admin requested manual resending of the confirmation template."
-    })
-    save_db(db)
+    }
+    await OrderRepository.add_timeline_event(payload.orderId, timeline_event)
 
-    asyncio.create_task(queue_notification(payload.orderId, "confirmation"))
+    updated_order = await OrderRepository.get_by_id(payload.orderId)
+    updated_order["_id"] = str(updated_order["_id"])
+    await sio.emit("order_confirmation_updated", updated_order)
+
+    asyncio.create_task(NotificationService.queue_notification(payload.orderId, "confirmation"))
     return {"success": True}
 
 @app.get("/api/analytics/order-confirmation")
-def get_order_confirmation_analytics():
-    db = load_db()
+async def get_order_confirmation_analytics_endpoint():
+    db = await load_db_async()
     orders = [o for o in db.get("orders", []) if o.get("confirmation_requested_at") is not None]
     notifs = db.get("notifications", [])
     settings = db.get("communicationSettings", {})
@@ -1515,9 +1036,8 @@ def get_order_confirmation_analytics():
     }
 
 @app.post("/api/orders/simulate-time-leap")
-async def simulate_time_leap(payload: SimulateTimeLeapPayload):
-    db = load_db()
-    order = next((o for o in db.get("orders", []) if o["id"] == payload.orderId), None)
+async def simulate_time_leap_endpoint(payload: SimulateTimeLeapPayload):
+    order = await OrderRepository.get_by_id(payload.orderId)
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 
@@ -1525,49 +1045,72 @@ async def simulate_time_leap(payload: SimulateTimeLeapPayload):
     requested_at = datetime.fromisoformat(req_at_str) if req_at_str else datetime.now()
 
     offset = timedelta(hours=payload.hours)
-    order["confirmation_requested_at"] = (requested_at - offset).isoformat()
+    shifted_req_at = (requested_at - offset).isoformat()
+    
+    # Update order times
+    await OrderRepository.update(payload.orderId, {
+        "confirmation_requested_at": shifted_req_at,
+        "updated_at": datetime.now()
+    })
 
-    for step in order.get("timeline", []):
+    # Shift timeline timestamps
+    timeline = order.get("timeline", [])
+    for step in timeline:
         if step["status"] == "Pending Confirmation" or "Sent" in step["status"]:
             try:
                 t_val = datetime.fromisoformat(step["timestamp"])
                 step["timestamp"] = (t_val - offset).isoformat()
             except ValueError:
                 pass
+    
+    await OrderRepository.update(payload.orderId, {"timeline": timeline})
 
-    save_db(db)
+    # Force scheduler check
+    await NotificationService.run_schedule_check()
 
-    await sio.emit("order_status", { "status": order["status"], "timeline": order["timeline"] }, room=payload.orderId)
-    await sio.emit("order_confirmation_updated", order)
+    updated_order = await OrderRepository.get_by_id(payload.orderId)
+    updated_order["_id"] = str(updated_order["_id"])
 
-    print(f"[Time Leap Simulator] Order {payload.orderId} timestamp shifted back by {payload.hours} hours.")
+    await sio.emit("order_status", { "status": updated_order["status"], "timeline": updated_order["timeline"] }, room=payload.orderId)
+    await sio.emit("order_confirmation_updated", updated_order)
 
-    await run_schedule_check()
-
-    db = load_db()
-    updated_order = next((o for o in db["orders"] if o["id"] == payload.orderId), order)
     return {"success": True, "order": updated_order}
 
 @app.get("/api/orders/conversations/{order_id}")
-def get_conversations(order_id: str):
-    db = load_db()
-    return [c for c in db.get("conversations", []) if c.get("order_id") == order_id]
+async def get_conversations_endpoint(order_id: str):
+    cursor = Database.db.conversations.find({"order_id": order_id, "is_deleted": False}).sort("timestamp", 1)
+    convs = await cursor.to_list(length=100)
+    for c in convs:
+        c["_id"] = str(c["_id"])
+    return convs
 
 @app.get("/api/orders/settings")
-def get_settings():
-    db = load_db()
-    return db.get("communicationSettings", {})
+async def get_settings_endpoint():
+    settings_doc = await Database.db.settings.find_one({"is_deleted": False})
+    if settings_doc:
+        settings_doc["_id"] = str(settings_doc["_id"])
+        return settings_doc
+    return INITIAL_DB["communicationSettings"]
 
 @app.post("/api/orders/settings")
-async def save_settings(request: Request):
+async def save_settings_endpoint(request: Request):
     new_settings = await request.json()
-    db = load_db()
-    db["communicationSettings"] = new_settings
-    save_db(db)
+    new_settings["is_deleted"] = False
+    new_settings["updated_at"] = datetime.now()
 
+    # Strip ObjectId if provided from frontend
+    if "_id" in new_settings:
+        del new_settings["_id"]
+
+    await Database.db.settings.update_one(
+        {"is_deleted": False},
+        {"$set": new_settings},
+        upsert=True
+    )
+    
     await sio.emit("communication_settings_updated", new_settings)
     return {"success": True, "settings": new_settings}
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(socket_app, host="127.0.0.1", port=8000)
+    uvicorn.run("main:socket_app", host="127.0.0.1", port=8000, reload=True)
