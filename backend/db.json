@@ -962,6 +962,46 @@
   ],
   "auditLogs": [
     {
+      "id": "log-1784263821032",
+      "timestamp": "2026-07-17T04:50:21.032Z",
+      "username": "admin@delivo.com",
+      "role": "Admin",
+      "action": "2FA Verification Successful",
+      "module": "Auth",
+      "ipAddress": "127.0.0.1",
+      "browser": "Chrome 126.0 (Windows)"
+    },
+    {
+      "id": "log-1784263816139",
+      "timestamp": "2026-07-17T04:50:16.139Z",
+      "username": "admin@delivo.com",
+      "role": "Admin",
+      "action": "Attempt Login",
+      "module": "Auth",
+      "ipAddress": "127.0.0.1",
+      "browser": "Chrome 126.0 (Windows)"
+    },
+    {
+      "id": "log-1784205881659",
+      "timestamp": "2026-07-16T12:44:41.659Z",
+      "username": "admin@delivo.com",
+      "role": "Admin",
+      "action": "2FA Verification Successful",
+      "module": "Auth",
+      "ipAddress": "127.0.0.1",
+      "browser": "Chrome 126.0 (Windows)"
+    },
+    {
+      "id": "log-1784205876818",
+      "timestamp": "2026-07-16T12:44:36.818Z",
+      "username": "admin@delivo.com",
+      "role": "Admin",
+      "action": "Attempt Login",
+      "module": "Auth",
+      "ipAddress": "127.0.0.1",
+      "browser": "Chrome 126.0 (Windows)"
+    },
+    {
       "id": "log-1784203705847",
       "timestamp": "2026-07-16T12:08:25.848Z",
       "username": "admin@delivo.com",
@@ -1472,6 +1512,15 @@
       "direction": "outgoing",
       "provider": "whatsapp",
       "timestamp": "2026-07-16T11:18:38.357Z"
+    },
+    {
+      "id": "conv-1784205980649",
+      "order_id": "unknown",
+      "customer_number": "+1 555-8874",
+      "message": "hello your order is ready",
+      "direction": "incoming",
+      "provider": "whatsapp",
+      "timestamp": "2026-07-16T12:46:20.649Z"
     }
   ],
   "communicationSettings": {
