@@ -1,1 +1,0 @@
-# Verified password candidate check.
