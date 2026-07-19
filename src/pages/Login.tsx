@@ -6,22 +6,21 @@ import {
   FormControlLabel, Grid, useTheme, Divider, Modal, Paper, Alert
 } from '@mui/material';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShieldCheck, Mail, Lock, PhoneCall, ShieldAlert, KeyRound } from 'lucide-react';
-import { RootState, loginRequest, verify2FA, addAuditLog } from '../store';
+import { ShieldCheck, Mail, Lock, PhoneCall, ShieldAlert, KeyRound, Loader2 } from 'lucide-react';
+import { RootState, loginThunk, verify2FA, addAuditLog } from '../store';
 import { Role } from '../store';
 
 const Login: React.FC = () => {
-  const dispatch = useDispatch();
+  const dispatch = useDispatch<any>();
   const navigate = useNavigate();
   const theme = useTheme();
   
   const { mode } = useSelector((state: RootState) => state.ui);
-  const { is2FARequired, user } = useSelector((state: RootState) => state.auth);
+  const { isLoading, error } = useSelector((state: RootState) => state.auth);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
-  const [otpCode, setOtpCode] = useState('');
   
   const [forgotOpen, setForgotOpen] = useState(false);
   const [forgotEmail, setForgotEmail] = useState('');
@@ -31,11 +30,9 @@ const Login: React.FC = () => {
     e.preventDefault();
     if (!email || !password) return;
     
-    // Default mock login role is Admin
-    dispatch(loginRequest({
+    dispatch(loginThunk({
       email,
-      name: email.split('@')[0].toUpperCase(),
-      role: 'Admin',
+      password,
       rememberMe
     }));
 
@@ -49,49 +46,7 @@ const Login: React.FC = () => {
     }));
   };
 
-  const handleQuickLogin = (role: Role) => {
-    const roleEmail = `${role.toLowerCase().replace(/\s/g, '')}@delivo.com`;
-    const roleName = `${role} Demo`;
-    
-    dispatch(loginRequest({
-      email: roleEmail,
-      name: roleName,
-      role,
-      rememberMe: true
-    }));
 
-    dispatch(addAuditLog({
-      username: roleEmail,
-      role,
-      action: `Quick Login Selected`,
-      module: 'Auth',
-      ipAddress: '127.0.0.1',
-      browser: 'Chrome 126.0 (Windows)'
-    }));
-
-    // If role doesn't require 2FA, navigate immediately
-    if (!['Super Admin', 'Admin', 'Finance Manager'].includes(role)) {
-      navigate('/dashboard');
-    }
-  };
-
-  const handle2FASubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (otpCode.length === 6) {
-      dispatch(verify2FA(otpCode));
-      
-      dispatch(addAuditLog({
-        username: user?.email || 'unknown',
-        role: user?.role || 'Guest',
-        action: '2FA Verification Successful',
-        module: 'Auth',
-        ipAddress: '127.0.0.1',
-        browser: 'Chrome 126.0 (Windows)'
-      }));
-
-      navigate('/dashboard');
-    }
-  };
 
   const handleForgotSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -138,8 +93,6 @@ const Login: React.FC = () => {
         )}
         <CardContent sx={{ p: { xs: 3, md: 4.5 } }}>
           <AnimatePresence mode="wait">
-            {!is2FARequired ? (
-              // STEP 1: Email Password Form / Quick login
               <motion.div
                 key="login-form"
                 initial={{ opacity: 0, x: -20 }}
@@ -178,7 +131,7 @@ const Login: React.FC = () => {
                       fullWidth
                       type="email"
                       value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      onChange={(e: any) => setEmail(e.target.value)}
                       placeholder="admin@delivo.com"
                       InputProps={{
                         startAdornment: <Mail size={18} style={{ marginRight: 10, color: theme.palette.text.secondary }} />
@@ -191,7 +144,7 @@ const Login: React.FC = () => {
                       fullWidth
                       type="password"
                       value={password}
-                      onChange={(e) => setPassword(e.target.value)}
+                      onChange={(e: any) => setPassword(e.target.value)}
                       placeholder="••••••••"
                       InputProps={{
                         startAdornment: <Lock size={18} style={{ marginRight: 10, color: theme.palette.text.secondary }} />
@@ -201,7 +154,7 @@ const Login: React.FC = () => {
 
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <FormControlLabel
-                        control={<Checkbox checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} color="primary" />}
+                        control={<Checkbox checked={rememberMe} onChange={(e: any) => setRememberMe(e.target.checked)} color="primary" />}
                         label={<Typography variant="body2">Remember Me</Typography>}
                       />
                       <Button 
@@ -213,126 +166,26 @@ const Login: React.FC = () => {
                       </Button>
                     </Box>
 
+                    {error && (
+                      <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>
+                        {error}
+                      </Alert>
+                    )}
+
                     <Button 
                       type="submit" 
                       variant="contained" 
                       size="large"
                       fullWidth
+                      disabled={isLoading}
                       sx={{ py: 1.5, borderRadius: 3, boxShadow: '0 4px 15px rgba(4, 120, 87, 0.2)' }}
                     >
-                      Authenticate Securely
+                      {isLoading ? <Loader2 className="animate-spin" /> : 'Authenticate Securely'}
                     </Button>
                   </Box>
                 </form>
 
-                <Divider sx={{ my: 3 }}>
-                  <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
-                    DEMO SIMULATOR QUICK LOGIN
-                  </Typography>
-                </Divider>
-
-                <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary', textAlign: 'center', mb: 1.5 }}>
-                  Select a role to bypass database setup and view instant dashboard access configurations:
-                </Typography>
-
-                <Grid container spacing={1}>
-                  {[
-                    { role: 'Super Admin', color: 'primary' },
-                    { role: 'Kitchen Manager', color: 'success' },
-                    { role: 'Delivery Manager', color: 'info' },
-                    { role: 'Finance Manager', color: 'secondary' }
-                  ].map((btn) => (
-                    <Grid item xs={6} key={btn.role}>
-                      <Button
-                        fullWidth
-                        size="small"
-                        variant="outlined"
-                        onClick={() => handleQuickLogin(btn.role as Role)}
-                        sx={{ 
-                          fontSize: '0.72rem', 
-                          fontWeight: 700, 
-                          borderRadius: 2, 
-                          py: 1, 
-                          color: `${btn.color}.main`, 
-                          borderColor: `${btn.color}.main`,
-                          bgcolor: `${btn.color}.main` + '05',
-                          '&:hover': {
-                            bgcolor: `${btn.color}.main` + '10',
-                            borderColor: `${btn.color}.main`,
-                          }
-                        }}
-                      >
-                        {btn.role}
-                      </Button>
-                    </Grid>
-                  ))}
-                </Grid>
               </motion.div>
-            ) : (
-              // STEP 2: 2-Factor OTP input
-              <motion.div
-                key="2fa-form"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.2 }}
-              >
-                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 3 }}>
-                  <Box sx={{ 
-                    width: 50, 
-                    height: 50, 
-                    borderRadius: 3, 
-                    bgcolor: 'secondary.main',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    boxShadow: '0 4px 20px rgba(13, 148, 136, 0.4)',
-                    mb: 1.5
-                  }}>
-                    <PhoneCall size={26} color="white" />
-                  </Box>
-                  <Typography variant="h4" sx={{ fontFamily: 'Outfit', fontWeight: 800 }}>
-                    Two-Factor Auth
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5, textAlign: 'center' }}>
-                    Enter the code sent to your registered device to log in as <strong>{user?.name}</strong>.
-                  </Typography>
-                </Box>
-
-                <Alert severity="info" sx={{ mb: 3, borderRadius: 2 }}>
-                  <Typography variant="caption" sx={{ display: 'block' }}>
-                    <strong>Simulator Token:</strong> Enter any 6-digit code (e.g. <code>123456</code>) to verify.
-                  </Typography>
-                </Alert>
-
-                <form onSubmit={handle2FASubmit}>
-                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3.5 }}>
-                    <TextField
-                      label="6-Digit Verification Code"
-                      variant="outlined"
-                      fullWidth
-                      type="text"
-                      inputProps={{ maxLength: 6, style: { textAlign: 'center', letterSpacing: '10px', fontSize: '1.2rem', fontWeight: 800 } }}
-                      placeholder="000000"
-                      value={otpCode}
-                      onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
-                      sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
-                    />
-
-                    <Button 
-                      type="submit" 
-                      variant="contained" 
-                      size="large"
-                      fullWidth
-                      disabled={otpCode.length !== 6}
-                      sx={{ py: 1.5, borderRadius: 3, bgcolor: 'secondary.main', '&:hover': { bgcolor: 'secondary.dark' } }}
-                    >
-                      Verify Token & Access
-                    </Button>
-                  </Box>
-                </form>
-              </motion.div>
-            )}
           </AnimatePresence>
         </CardContent>
       </Card>
@@ -345,7 +198,7 @@ const Login: React.FC = () => {
             <Typography variant="h6" sx={{ fontFamily: 'Outfit', fontWeight: 700 }}>Reset Password</Typography>
           </Box>
           <Typography variant="body2" sx={{ color: 'text.secondary', mb: 3 }}>
-            Enter your email address and we will simulate sending a secure password reset link to your inbox.
+            Enter your email address and we will send a secure password reset link to your inbox.
           </Typography>
           {forgotSent ? (
             <Alert severity="success" sx={{ borderRadius: 2 }}>
@@ -361,7 +214,7 @@ const Login: React.FC = () => {
                   required
                   type="email"
                   value={forgotEmail}
-                  onChange={(e) => setForgotEmail(e.target.value)}
+                  onChange={(e: any) => setForgotEmail(e.target.value)}
                   placeholder="admin@delivo.com"
                   sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
                 />

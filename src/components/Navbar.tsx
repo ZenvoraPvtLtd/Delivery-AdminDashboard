@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { 
   RootState, setActiveOutlet, markAllNotificationsRead, 
-  clearNotifications, loginRequest, addAuditLog, logout, updateUserProfile,
+  clearNotifications, addAuditLog, logout, updateUserProfile,
   addNotification, markNotificationRead
 } from '../store';
 import { Role } from '../store';
@@ -102,11 +102,10 @@ const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
   };
 
   const handleRoleChange = (newRole: Role) => {
-    dispatch(loginRequest({
-      email: `${newRole.toLowerCase().replace(/\s/g, '')}@delivo.com`,
-      name: `Demo ${newRole}`,
-      role: newRole,
-      rememberMe: true
+    dispatch(addNotification({
+      title: 'Role Switching Disabled',
+      description: 'You cannot switch roles dynamically on a production backend without logging out.',
+      type: 'system'
     }));
     
     // Add audit log for simulation

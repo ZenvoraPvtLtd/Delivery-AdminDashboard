@@ -1,9 +1,9 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
-import { RootState } from './store';
+import { RootState, fetchCurrentUserThunk } from './store';
 import { getTheme } from './theme';
 
 // Layout
@@ -32,7 +32,15 @@ import CommunicationSettings from './pages/CommunicationSettings';
 
 const App: React.FC = () => {
   const mode = useSelector((state: RootState) => state.ui.mode);
+  const dispatch = useDispatch<any>();
   const theme = getTheme(mode);
+
+  React.useEffect(() => {
+    const token = localStorage.getItem('access_token');
+    if (token) {
+      dispatch(fetchCurrentUserThunk());
+    }
+  }, [dispatch]);
 
   return (
     <ThemeProvider theme={theme}>

@@ -1,29 +1,36 @@
-import React, { useState } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useDispatch } from 'react-redux';
 import { 
   Box, Typography, Card, CardContent, Grid, Button, Table, 
   TableBody, TableCell, TableContainer, TableHead, TableRow, 
   Chip, Dialog, DialogTitle, DialogContent, DialogActions, 
-  TextField, FormControl, InputLabel, Select, MenuItem, Alert, useTheme, IconButton
+  TextField, FormControl, InputLabel, Select, MenuItem, Alert, useTheme, IconButton,
+  CircularProgress, Pagination
 } from '@mui/material';
 import { 
   Boxes, AlertTriangle, Plus, Minus, FilePlus2, 
   Truck, ArrowUpDown, Calendar, HelpCircle 
 } from 'lucide-react';
-import { RootState, adjustRawMaterialStock, addAuditLog, addNotification } from '../store';
+import { addNotification } from '../store';
+import { inventoryService, InventoryItem, PurchaseOrder } from '../services/inventoryService';
 
 const Inventory: React.FC = () => {
   const theme = useTheme();
   const dispatch = useDispatch();
 
-  const currentUser = useSelector((state: RootState) => state.auth.user);
-  const rawMaterials = useSelector((state: RootState) => state.db.rawMaterials);
+  const [rawMaterials, setRawMaterials] = useState<InventoryItem[]>([]);
+  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const size = 10;
 
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   
   const [adjustOpen, setAdjustOpen] = useState(false);
-  const [adjustItem, setAdjustItem] = useState<typeof rawMaterials[0] | null>(null);
+  const [adjustItem, setAdjustItem] = useState<InventoryItem | null>(null);
   const [adjustAmount, setAdjustAmount] = useState('');
   
   const [poOpen, setPoOpen] = useState(false);
@@ -31,95 +38,91 @@ const Inventory: React.FC = () => {
   const [poQty, setPoQty] = useState('');
   const [poSupplier, setPoSupplier] = useState('');
 
-  // Local simulated purchase orders
-  const [purchaseOrders, setPurchaseOrders] = useState([
-    { id: 'po-501', item: 'Brioche Burger Buns', qty: 100, unit: 'pcs', supplier: 'Daily Bake Shop', status: 'Sent', date: '2026-07-08' },
-    { id: 'po-502', item: 'Mozzarella Cheese', qty: 25, unit: 'kg', supplier: 'Metro Dairy Farms', status: 'Received', date: '2026-07-06' }
-  ]);
+  const categories = ['All', 'Dairy', 'Produce', 'Meat', 'Bakery', 'Dry Goods', 'Beverages'];
 
-  const categories = ['All', ...Array.from(new Set(rawMaterials.map(m => m.category)))];
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 500);
+    return () => clearTimeout(timer);
+  }, [search]);
 
-  const filteredMaterials = rawMaterials.filter(m => {
-    const matchesSearch = m.name.toLowerCase().includes(search.toLowerCase()) || m.supplier.toLowerCase().includes(search.toLowerCase());
-    const matchesCat = selectedCategory === 'All' || m.category === selectedCategory;
-    return matchesSearch && matchesCat;
-  });
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const [res, poRes] = await Promise.all([
+        inventoryService.getInventory(page, size, debouncedSearch, selectedCategory),
+        inventoryService.getPurchaseOrders()
+      ]);
+      setRawMaterials(res.data);
+      setTotal(res.total);
+      setPurchaseOrders(poRes);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  }, [page, size, debouncedSearch, selectedCategory]);
 
-  const lowStockItems = rawMaterials.filter(m => m.stock < m.minStockAlert);
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
-  const handleAdjustSubmit = () => {
+  const lowStockItems = rawMaterials.filter(m => m.current_stock < m.min_stock_alert);
+
+  const handleAdjustSubmit = async () => {
     if (!adjustItem || !adjustAmount) return;
     const value = parseFloat(adjustAmount);
     if (isNaN(value)) return;
 
-    dispatch(adjustRawMaterialStock({
-      id: adjustItem.id,
-      amount: value
-    }));
+    try {
+      const res = await inventoryService.adjustStock(adjustItem.id, value);
+      
+      const updatedStock = res.current_stock;
+      if (updatedStock >= adjustItem.min_stock_alert && adjustItem.current_stock < adjustItem.min_stock_alert) {
+        dispatch(addNotification({
+          title: 'Inventory Restocked',
+          description: `${adjustItem.name} stock level recovered (${updatedStock.toFixed(1)} ${adjustItem.unit})`,
+          type: 'stock'
+        }));
+      } else {
+        dispatch(addNotification({
+          title: 'Stock Adjusted',
+          description: `${adjustItem.name} is now at ${updatedStock.toFixed(1)} ${adjustItem.unit}`,
+          type: 'stock'
+        }));
+      }
 
-    dispatch(addAuditLog({
-      username: currentUser?.email || 'Simulator Client',
-      role: currentUser?.role || 'Guest',
-      action: `Adjusted inventory stock for ${adjustItem.name} by ${value}`,
-      module: 'Inventory',
-      ipAddress: '127.0.0.1',
-      browser: 'Admin Console'
-    }));
-
-    // Trigger notification if item goes back above threshold
-    const updatedStock = adjustItem.stock + value;
-    if (updatedStock >= adjustItem.minStockAlert && adjustItem.stock < adjustItem.minStockAlert) {
-      dispatch(addNotification({
-        title: 'Inventory Restocked',
-        description: `${adjustItem.name} stock level recovered ($${updatedStock.toFixed(1)} ${adjustItem.unit})`,
-        type: 'stock'
-      }));
+      setAdjustOpen(false);
+      setAdjustItem(null);
+      setAdjustAmount('');
+      fetchData();
+    } catch (err) {
+      console.error(err);
     }
-
-    setAdjustOpen(false);
-    setAdjustItem(null);
-    setAdjustAmount('');
   };
 
-  const handlePOSubmit = () => {
+  const handlePOSubmit = async () => {
     if (!poItem || !poQty || !poSupplier) return;
     
-    const newPO = {
-      id: `po-${Date.now().toString().slice(-3)}`,
-      item: poItem,
-      qty: parseFloat(poQty),
-      unit: rawMaterials.find(m => m.name === poItem)?.unit || 'units',
-      supplier: poSupplier,
-      status: 'Sent',
-      date: new Date().toISOString().split('T')[0]
-    };
+    try {
+      await inventoryService.issuePurchaseOrder(poItem, parseFloat(poQty), poSupplier);
+      dispatch(addNotification({
+        title: 'Purchase Order Issued',
+        description: `Sent PO for ${poQty} of ${poItem} to ${poSupplier}`,
+        type: 'stock'
+      }));
 
-    setPurchaseOrders([newPO, ...purchaseOrders]);
-
-    dispatch(addNotification({
-      title: 'Purchase Order Issued',
-      description: `Sent PO for ${poQty} of ${poItem} to ${poSupplier}`,
-      type: 'stock'
-    }));
-
-    dispatch(addAuditLog({
-      username: currentUser?.email || 'Simulator Client',
-      role: currentUser?.role || 'Guest',
-      action: `Issued Purchase Order for ${poQty} ${poItem}`,
-      module: 'Inventory',
-      ipAddress: '127.0.0.1',
-      browser: 'Admin Console'
-    }));
-
-    setPoOpen(false);
-    setPoItem('');
-    setPoQty('');
-    setPoSupplier('');
+      setPoOpen(false);
+      setPoItem('');
+      setPoQty('');
+      setPoSupplier('');
+      fetchData();
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   return (
     <Box>
-      {/* Title */}
       <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Box>
           <Typography variant="h4" sx={{ fontFamily: 'Outfit', fontWeight: 800 }}>
@@ -140,7 +143,6 @@ const Inventory: React.FC = () => {
         </Button>
       </Box>
 
-      {/* Alerts for low stock */}
       {lowStockItems.length > 0 && (
         <Alert 
           severity="error" 
@@ -157,7 +159,7 @@ const Inventory: React.FC = () => {
                 <Box sx={{ p: 1, px: 2, bgcolor: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: 2 }}>
                   <Typography variant="body2" sx={{ fontWeight: 700 }}>{item.name}</Typography>
                   <Typography variant="caption" sx={{ color: 'error.main', fontWeight: 600 }}>
-                    {item.stock} {item.unit} remaining (Min: {item.minStockAlert} {item.unit})
+                    {item.current_stock} {item.unit} remaining (Min: {item.min_stock_alert} {item.unit})
                   </Typography>
                 </Box>
               </Grid>
@@ -167,7 +169,6 @@ const Inventory: React.FC = () => {
       )}
 
       <Grid container spacing={3.5}>
-        {/* Inventory list */}
         <Grid item xs={12} lg={8}>
           <Card>
             <CardContent sx={{ p: 2.5 }}>
@@ -197,97 +198,100 @@ const Inventory: React.FC = () => {
               </Box>
 
               <TableContainer sx={{ maxHeight: 400 }}>
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell sx={{ fontWeight: 700 }}>Ingredient</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }}>Category</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }} align="right">Stock Level</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }}>Supplier</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }}>Expiry Date</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }} align="center">Adjust</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {filteredMaterials.map((item) => {
-                      const isLow = item.stock < item.minStockAlert;
-                      return (
-                        <TableRow key={item.id} hover>
-                          <TableCell sx={{ fontWeight: 700 }}>{item.name}</TableCell>
-                          <TableCell>{item.category}</TableCell>
-                          <TableCell align="right" sx={{ fontWeight: 700, color: isLow ? 'error.main' : 'text.primary' }}>
-                            {item.stock} {item.unit}
-                            {isLow && (
-                              <Typography variant="caption" sx={{ display: 'block', color: 'error.main', fontSize: '0.65rem', fontWeight: 600 }}>
-                                Low Stock Alert
-                              </Typography>
-                            )}
-                          </TableCell>
-                          <TableCell>{item.supplier}</TableCell>
-                          <TableCell>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                              <Calendar size={13} color={theme.palette.text.secondary} />
-                              <Typography variant="body2">{item.expiryDate}</Typography>
-                            </Box>
-                          </TableCell>
-                          <TableCell align="center">
-                            <Box sx={{ display: 'flex', justifyContent: 'center', gap: 0.5 }}>
-                              <IconButton 
-                                size="small" 
-                                color="primary"
-                                onClick={() => { setAdjustItem(item); setAdjustOpen(true); }}
-                              >
-                                <ArrowUpDown size={15} />
-                              </IconButton>
-                            </Box>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
+                {loading ? (
+                  <Box sx={{ p: 4, textAlign: 'center' }}><CircularProgress /></Box>
+                ) : (
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell sx={{ fontWeight: 700 }}>Ingredient</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }}>Category</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }} align="right">Stock Level</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }}>Supplier</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }}>Expiry Date</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }} align="center">Adjust</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {rawMaterials.map((item) => {
+                        const isLow = item.current_stock < item.min_stock_alert;
+                        return (
+                          <TableRow key={item.id} hover>
+                            <TableCell sx={{ fontWeight: 700 }}>{item.name}</TableCell>
+                            <TableCell>{item.category}</TableCell>
+                            <TableCell align="right" sx={{ fontWeight: 700, color: isLow ? 'error.main' : 'text.primary' }}>
+                              {item.current_stock} {item.unit}
+                              {isLow && (
+                                <Typography variant="caption" sx={{ display: 'block', color: 'error.main', fontSize: '0.65rem', fontWeight: 600 }}>
+                                  Low Stock Alert
+                                </Typography>
+                              )}
+                            </TableCell>
+                            <TableCell>{item.supplier}</TableCell>
+                            <TableCell>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                <Calendar size={13} color={theme.palette.text.secondary} />
+                                <Typography variant="body2">{item.expiry_date || 'N/A'}</Typography>
+                              </Box>
+                            </TableCell>
+                            <TableCell align="center">
+                              <Box sx={{ display: 'flex', justifyContent: 'center', gap: 0.5 }}>
+                                <IconButton 
+                                  size="small" 
+                                  color="primary"
+                                  onClick={() => { setAdjustItem(item); setAdjustOpen(true); }}
+                                >
+                                  <ArrowUpDown size={15} />
+                                </IconButton>
+                              </Box>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                )}
               </TableContainer>
+              <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center' }}>
+                  <Pagination count={Math.ceil(total / size) || 1} page={page} onChange={(_, p) => setPage(p)} color="primary" />
+              </Box>
             </CardContent>
           </Card>
         </Grid>
 
-        {/* PO lists */}
         <Grid item xs={12} lg={4}>
           <Card sx={{ height: '100%' }}>
-            <CardContent sx={{ p: 3 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
-                <Truck size={18} color={theme.palette.secondary.main} />
-                <Typography variant="h6" sx={{ fontFamily: 'Outfit', fontWeight: 700 }}>
-                  Supplier Purchase Orders
-                </Typography>
-              </Box>
-
+            <CardContent sx={{ p: 2.5 }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 700, fontFamily: 'Outfit', mb: 3 }}>
+                Active Purchase Orders
+              </Typography>
+              
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                {purchaseOrders.map((po) => (
-                  <Box 
-                    key={po.id} 
-                    sx={{ 
-                      p: 2, 
-                      borderRadius: 2.5, 
-                      border: `1px solid ${theme.palette.divider}`,
-                      bgcolor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.01)' : 'rgba(0,0,0,0.01)'
-                    }}
-                  >
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                      <Typography variant="body2" sx={{ fontWeight: 700, color: 'primary.main' }}>{po.id}</Typography>
+                {purchaseOrders.length === 0 && !loading && (
+                  <Typography variant="body2" sx={{ color: 'text.secondary', textAlign: 'center', py: 4 }}>
+                    No active purchase orders.
+                  </Typography>
+                )}
+                {purchaseOrders.map(po => (
+                  <Box key={po.id} sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 700 }}>PO #{po.id.slice(-6)}</Typography>
                       <Chip 
                         label={po.status} 
                         size="small" 
-                        color={po.status === 'Received' ? 'success' : 'warning'}
-                        sx={{ height: 18, fontSize: '0.65rem', fontWeight: 700 }}
+                        color={po.status === 'Received' ? 'success' : 'primary'}
+                        sx={{ height: 20, fontSize: '0.7rem', fontWeight: 600 }}
                       />
                     </Box>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>{po.item}</Typography>
-                    <Typography variant="body2" sx={{ color: 'text.secondary', fontSize: '0.8rem' }}>
-                      Qty: {po.qty} {po.unit} | Supplier: {po.supplier}
+                    <Typography variant="h6" sx={{ fontFamily: 'Outfit', fontWeight: 700, mb: 0.5, lineHeight: 1.2 }}>
+                      {po.quantity} {po.unit} {po.item_name}
                     </Typography>
-                    <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 1 }}>
-                      Date Sent: {po.date}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: 'text.secondary', mb: 1.5 }}>
+                      <Truck size={14} />
+                      <Typography variant="caption">{po.supplier_name}</Typography>
+                    </Box>
+                    <Typography variant="caption" sx={{ color: 'text.disabled' }}>
+                      Issued on {po.date}
                     </Typography>
                   </Box>
                 ))}
@@ -297,67 +301,70 @@ const Inventory: React.FC = () => {
         </Grid>
       </Grid>
 
-      {/* Adjust Stock Dialog */}
-      <Dialog open={adjustOpen} onClose={() => setAdjustOpen(false)} PaperProps={{ sx: { borderRadius: 3, width: 350 } }}>
-        <DialogTitle sx={{ fontFamily: 'Outfit', fontWeight: 'bold' }}>
-          Adjust Stock: {adjustItem?.name}
-        </DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
-            Current Stock: <strong>{adjustItem?.stock} {adjustItem?.unit}</strong>
+      {/* Adjustment Dialog */}
+      <Dialog open={adjustOpen} onClose={() => setAdjustOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontFamily: 'Outfit', fontWeight: 700 }}>Adjust Stock Level</DialogTitle>
+        <DialogContent dividers sx={{ pt: 2 }}>
+          <Typography variant="body2" sx={{ mb: 2 }}>
+            Adjusting inventory for <strong>{adjustItem?.name}</strong>. Current level: {adjustItem?.current_stock} {adjustItem?.unit}
           </Typography>
           <TextField
-            fullWidth
+            label="Adjustment Amount (e.g. 5 or -2)"
             type="number"
-            label="Adjustment Amount (e.g. +10 or -5)"
+            fullWidth
+            size="small"
             value={adjustAmount}
             onChange={(e) => setAdjustAmount(e.target.value)}
-            placeholder="+0.00"
-            helperText="Prefix with a minus (-) sign to reduce stock levels"
-            sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+            helperText="Use negative numbers to manually deduct stock"
           />
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setAdjustOpen(false)}>Cancel</Button>
-          <Button onClick={handleAdjustSubmit} variant="contained" color="primary">Save Adjustment</Button>
+          <Button onClick={() => setAdjustOpen(false)} sx={{ textTransform: 'none' }}>Cancel</Button>
+          <Button variant="contained" onClick={handleAdjustSubmit} sx={{ textTransform: 'none', borderRadius: 2 }}>
+            Confirm Adjustment
+          </Button>
         </DialogActions>
       </Dialog>
 
       {/* PO Dialog */}
-      <Dialog open={poOpen} onClose={() => setPoOpen(false)} PaperProps={{ sx: { borderRadius: 3, width: 400 } }}>
-        <DialogTitle sx={{ fontFamily: 'Outfit', fontWeight: 'bold' }}>New Purchase Order</DialogTitle>
-        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
+      <Dialog open={poOpen} onClose={() => setPoOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontFamily: 'Outfit', fontWeight: 700 }}>Create Purchase Order</DialogTitle>
+        <DialogContent dividers sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 3 }}>
+          <Alert severity="info" icon={<HelpCircle size={20} />}>
+            Issuing a purchase order will notify the supplier via their registered EDI endpoints.
+          </Alert>
+          
           <FormControl fullWidth size="small">
-            <InputLabel>Target Ingredient</InputLabel>
-            <Select
-              value={poItem}
-              label="Target Ingredient"
-              onChange={(e) => setPoItem(e.target.value)}
-            >
-              {rawMaterials.map(m => <MenuItem key={m.id} value={m.name}>{m.name} ({m.unit})</MenuItem>)}
+            <InputLabel>Material Item</InputLabel>
+            <Select value={poItem} label="Material Item" onChange={(e) => setPoItem(e.target.value)}>
+              {rawMaterials.map(m => (
+                <MenuItem key={m.id} value={m.name}>{m.name} ({m.unit})</MenuItem>
+              ))}
             </Select>
           </FormControl>
+          
           <TextField
+            label="Quantity Requested"
+            type="number"
             fullWidth
             size="small"
-            type="number"
-            label="Quantity Order Size"
             value={poQty}
             onChange={(e) => setPoQty(e.target.value)}
           />
+
           <TextField
+            label="Supplier Entity"
             fullWidth
             size="small"
-            label="Target Supplier"
             value={poSupplier}
             onChange={(e) => setPoSupplier(e.target.value)}
-            placeholder="e.g. Metro Dairy Farms"
+            helperText="Leave empty to use default supplier associated with the item"
           />
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setPoOpen(false)}>Cancel</Button>
-          <Button onClick={handlePOSubmit} variant="contained" color="primary" disabled={!poItem || !poQty || !poSupplier}>
-            Issue Order
+          <Button onClick={() => setPoOpen(false)} sx={{ textTransform: 'none' }}>Cancel</Button>
+          <Button variant="contained" onClick={handlePOSubmit} sx={{ textTransform: 'none', borderRadius: 2 }}>
+            Send PO Authorization
           </Button>
         </DialogActions>
       </Dialog>

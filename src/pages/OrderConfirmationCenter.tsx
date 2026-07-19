@@ -18,11 +18,11 @@ import {
   Tooltip as ChartTooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell 
 } from 'recharts';
 import { motion, AnimatePresence } from 'framer-motion';
-import axios from 'axios';
 import { 
   RootState, AppDispatch, addNotification, addAuditLog, fetchDb,
   updateOrderConfirmation, addNotificationLog, addConversationLog
 } from '../store';
+import { orderConfirmationService } from '../services/orderConfirmationService';
 
 const OrderConfirmationCenter: React.FC = () => {
   const theme = useTheme();
@@ -69,14 +69,15 @@ const OrderConfirmationCenter: React.FC = () => {
   }, [orders, selectedOrderId]);
 
   // Load database and setup Socket.IO
-  const loadData = () => {
+  const loadData = async () => {
     dispatch(fetchDb());
-    axios.get('/api/analytics/order-confirmation')
-      .then(res => {
-        setKpiCards(res.data.cards);
-        setAnalyticsData(res.data.analytics);
-      })
-      .catch(err => console.error('Failed to load confirmation analytics:', err));
+    try {
+      const res = await orderConfirmationService.getAnalytics();
+      setKpiCards(res.cards);
+      setAnalyticsData(res.analytics);
+    } catch (err) {
+      console.error('Failed to load confirmation analytics:', err);
+    }
   };
 
   useEffect(() => {
@@ -88,10 +89,12 @@ const OrderConfirmationCenter: React.FC = () => {
 
     if (socket) {
       console.log('[Socket] Subscribed to Live Updates in Confirmation Hub');
-      socket.on('order_confirmation_updated', (updatedOrder: any) => {
+      socket.on('order_confirmation_updated', async (updatedOrder: any) => {
         dispatch(updateOrderConfirmation(updatedOrder));
-        // Refresh analytics periodically
-        axios.get('/api/analytics/order-confirmation').then(res => setKpiCards(res.data.cards));
+        try {
+          const res = await orderConfirmationService.getAnalytics();
+          setKpiCards(res.cards);
+        } catch(e) {}
       });
       socket.on('new_notification', (newNotif: any) => {
         dispatch(addNotificationLog(newNotif));
@@ -125,11 +128,10 @@ const OrderConfirmationCenter: React.FC = () => {
     };
   }, [dispatch]);
 
-  // Retrieve chat history when chat modal opens
   useEffect(() => {
     if (chatOrderId) {
-      axios.get(`/api/orders/conversations/${chatOrderId}`)
-        .then(res => setChatHistory(res.data))
+      orderConfirmationService.getConversations(chatOrderId)
+        .then(res => setChatHistory(res))
         .catch(err => console.error(err));
     }
   }, [chatOrderId]);
@@ -188,84 +190,81 @@ const OrderConfirmationCenter: React.FC = () => {
   }, [orders, notifications, search, statusFilter, dateFilter, customStartDate, customEndDate]);
 
   // Handle Operations Action Dispatches
-  const handleForceConfirm = (orderId: string) => {
-    axios.post('/api/orders/confirm', { orderId })
-      .then(() => {
-        dispatch(addNotification({
-          title: 'Order Force Confirmed',
-          description: `Order #${orderId.split('-')[1]} confirmed manually by Admin.`,
-          type: 'order'
-        }));
-        loadData();
-      })
-      .catch(err => console.error(err));
+  const handleForceConfirm = async (orderId: string) => {
+    try {
+      await orderConfirmationService.forceConfirm(orderId);
+      dispatch(addNotification({
+        title: 'Order Force Confirmed',
+        description: `Order #${orderId.split('-')[1]} confirmed manually by Admin.`,
+        type: 'order'
+      }));
+      loadData();
+    } catch (err) {
+      console.error(err);
+    }
   };
 
-  const handleForceCancel = (orderId: string) => {
+  const handleForceCancel = async (orderId: string) => {
     const reason = prompt('Specify Cancellation Reason:', 'Admin Forced Cancel');
-    if (reason === null) return; // cancelled prompt
+    if (reason === null) return;
     
-    axios.post('/api/orders/cancel', { orderId, reason })
-      .then(() => {
-        dispatch(addNotification({
-          title: 'Order Cancelled',
-          description: `Order #${orderId.split('-')[1]} was marked as Cancelled.`,
-          type: 'order'
-        }));
-        loadData();
-      })
-      .catch(err => console.error(err));
+    try {
+      await orderConfirmationService.forceCancel(orderId, reason);
+      dispatch(addNotification({
+        title: 'Order Cancelled',
+        description: `Order #${orderId.split('-')[1]} was marked as Cancelled.`,
+        type: 'order'
+      }));
+      loadData();
+    } catch (err) {
+      console.error(err);
+    }
   };
 
-  const handleResend = (orderId: string, channel: 'whatsapp' | 'sms' | 'both') => {
-    axios.post('/api/orders/resend', { orderId, channel })
-      .then(() => {
-        dispatch(addNotification({
-          title: 'Confirmation Resent',
-          description: `Resending instructions via ${channel.toUpperCase()}`,
-          type: 'system'
-        }));
-      })
-      .catch(err => console.error(err));
+  const handleResend = async (orderId: string, channel: 'whatsapp' | 'sms' | 'both') => {
+    try {
+      await orderConfirmationService.resendConfirmation(orderId, channel);
+      dispatch(addNotification({
+        title: 'Confirmation Resent',
+        description: `Resending instructions via ${channel.toUpperCase()}`,
+        type: 'system'
+      }));
+    } catch (err) {
+      console.error(err);
+    }
   };
 
-  // Simulators: Fast-Forward Time
-  const handleTimeLeap = (orderId: string, hours: number) => {
-    axios.post('/api/orders/simulate-time-leap', { orderId, hours })
-      .then(res => {
-        dispatch(addNotification({
-          title: 'Time Fast-Forwarded',
-          description: `Simulated ${hours} hours passing for Order #${orderId.split('-')[1]}. Check timeline.`,
-          type: 'system'
-        }));
-        loadData();
-      })
-      .catch(err => console.error(err));
+  const handleTimeLeap = async (orderId: string, hours: number) => {
+    try {
+      await orderConfirmationService.simulateTimeLeap(orderId, hours);
+      dispatch(addNotification({
+        title: 'Time Fast-Forwarded',
+        description: `Simulated ${hours} hours passing for Order #${orderId.split('-')[1]}. Check timeline.`,
+        type: 'system'
+      }));
+      loadData();
+    } catch (err) {
+      console.error(err);
+    }
   };
 
-  // Simulator: Customer Reply via Webhook
-  const handleSendSimChat = (e: React.FormEvent) => {
+  const handleSendSimChat = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!simText.trim() || !chatOrderId) return;
 
     setSendingSim(true);
     const order = orders.find(o => o.id === chatOrderId);
-    const endpoint = simChannel === 'whatsapp' ? '/api/webhook/whatsapp' : '/api/webhook/sms';
+    const fromNum = order?.customerPhone || '+1 555-0100';
     
-    axios.post(endpoint, {
-      From: order?.customerPhone || '+1 555-0100',
-      Body: simText.trim()
-    })
-    .then(() => {
+    try {
+      await orderConfirmationService.sendSimulatedWebhook(simChannel, fromNum, simText.trim());
       setSimText('');
       setSendingSim(false);
-      // Reload details to ensure states sync
       loadData();
-    })
-    .catch(err => {
+    } catch (err) {
       console.error(err);
       setSendingSim(false);
-    });
+    }
   };
 
   // CSV Exporter

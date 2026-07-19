@@ -1,306 +1,280 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { 
-  Box, Typography, Card, CardContent, Grid, Button, Table, 
-  TableBody, TableCell, TableContainer, TableHead, TableRow, 
-  Chip, Dialog, DialogTitle, DialogContent, DialogActions, 
-  TextField, FormControl, InputLabel, Select, MenuItem, useTheme, IconButton,
-  Avatar, Divider
+  Box, Typography, Card, CardContent, Grid, Button, 
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, 
+  Chip, Avatar, IconButton, Dialog, DialogTitle, DialogContent, 
+  DialogActions, TextField, MenuItem, FormControl, InputLabel, Select,
+  useTheme, Tooltip, CircularProgress
 } from '@mui/material';
-import { Users, Plus, ShieldCheck, Trash2, KeyRound, Store, Eye } from 'lucide-react';
+import { 
+  Users as UsersIcon, Plus, UserPlus, Shield, UserX, UserCheck, Search, FileEdit, Trash2 
+} from 'lucide-react';
 import { RootState, addAuditLog, addNotification } from '../store';
-import { Role } from '../store';
+import { userService, UserResponse } from '../services/userService';
 
 const UserManagement: React.FC = () => {
   const theme = useTheme();
   const dispatch = useDispatch();
-
   const currentUser = useSelector((state: RootState) => state.auth.user);
-  const outlets = useSelector((state: RootState) => state.db.outlets);
 
-  const [addOpen, setAddOpen] = useState(false);
-  
-  // Profile view states
-  const [selectedUser, setSelectedUser] = useState<any>(null);
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [users, setUsers] = useState<UserResponse[]>([]);
 
-  const handleViewProfile = (u: any) => {
-    setSelectedUser(u);
-    setIsProfileOpen(true);
-  };
-  
-  // Local simulated admin users list
-  const [users, setUsers] = useState([
-    { id: 'usr-1', name: 'Super Admin', email: 'superadmin@delivo.com', role: 'Super Admin', outlet: 'All Outlets', lastActive: 'Active now' },
-    { id: 'usr-2', name: 'Sarah Jenkins', email: 'sarah.j@delivo.com', role: 'Outlet Manager', outlet: 'Downtown Central Outlet', lastActive: '2 hours ago' },
-    { id: 'usr-3', name: 'Chef Sarah', email: 'sarah.chef@delivo.com', role: 'Kitchen Manager', outlet: 'Downtown Central Outlet', lastActive: '5 mins ago' },
-    { id: 'usr-4', name: 'Rider Controller', email: 'delivery.manager@delivo.com', role: 'Delivery Manager', outlet: 'All Outlets', lastActive: '1 day ago' }
-  ]);
-
-  // Form states
+  // Dialog states
+  const [userModalOpen, setUserModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState<'create'|'edit'>('create');
   const [uName, setUName] = useState('');
   const [uEmail, setUEmail] = useState('');
-  const [uRole, setURole] = useState<Role>('Outlet Manager');
-  const [uOutlet, setUOutlet] = useState('all');
+  const [uRole, setURole] = useState('Admin');
 
-  const handleCreateUser = (e: React.FormEvent) => {
+  // Search state
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const fetchUsers = useCallback(async () => {
+    try {
+      setLoading(true);
+      const data = await userService.getUsers();
+      setUsers(data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
+
+  const handleOpenCreate = () => {
+    setModalMode('create');
+    setUName('');
+    setUEmail('');
+    setURole('Admin');
+    setUserModalOpen(true);
+  };
+
+  const handleUserSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!uName || !uEmail) return;
 
-    const targetOutletName = uOutlet === 'all' ? 'All Outlets' : outlets.find(o => o.id === uOutlet)?.name || 'All Outlets';
-
-    const newUser = {
-      id: `usr-${Date.now().toString().slice(-3)}`,
-      name: uName,
-      email: uEmail,
-      role: uRole,
-      outlet: targetOutletName,
-      lastActive: 'Never logged in'
-    };
-
-    setUsers([...users, newUser]);
-
+    // Simulate creation/update via API then refetch
+    // In actual implementation, we'd POST/PUT to backend
     dispatch(addNotification({
-      title: 'Admin User Registered',
-      description: `Registered ${uName} as ${uRole} profile.`,
+      title: modalMode === 'create' ? 'User Created' : 'User Updated',
+      description: `${uName} has been ${modalMode === 'create' ? 'added to' : 'updated in'} the system directory.`,
       type: 'system'
     }));
 
     dispatch(addAuditLog({
       username: currentUser?.email || 'Simulator Client',
       role: currentUser?.role || 'Guest',
-      action: `Created admin user account: ${uEmail} with role ${uRole}`,
+      action: `${modalMode === 'create' ? 'Created' : 'Updated'} user profile: ${uName}`,
       module: 'User Management',
       ipAddress: '127.0.0.1',
       browser: 'Admin Console'
     }));
 
-    setAddOpen(false);
-    setUName('');
-    setUEmail('');
-  };
-
-  const handleDeleteUser = (id: string, name: string) => {
-    if (confirm(`Remove admin account for "${name}"?`)) {
-      setUsers(users.filter(u => u.id !== id));
-
-      dispatch(addNotification({
-        title: 'User Access Revoked',
-        description: `Revoked dashboard access for ${name}.`,
-        type: 'system'
-      }));
-
-      dispatch(addAuditLog({
-        username: currentUser?.email || 'Simulator Client',
-        role: currentUser?.role || 'Guest',
-        action: `Deleted admin account for ${name} (ID: ${id})`,
-        module: 'User Management',
-        ipAddress: '127.0.0.1',
-        browser: 'Admin Console'
-      }));
+    setUserModalOpen(false);
+    
+    // Simulate updating local state for immediate feedback
+    if (modalMode === 'create') {
+      const newUser: UserResponse = {
+        id: `USR-${Date.now().toString().slice(-4)}`,
+        name: uName,
+        email: uEmail,
+        role: uRole,
+        department: 'Operations',
+        status: 'Active',
+        lastActive: new Date().toISOString().split('T')[0]
+      };
+      setUsers([...users, newUser]);
     }
   };
 
+  const filteredUsers = users.filter(u => 
+    u.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    u.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    u.role.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
     <Box>
-      {/* Title */}
-      <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <Box>
           <Typography variant="h4" sx={{ fontFamily: 'Outfit', fontWeight: 800 }}>
-            User Account Management
+            User Management Directory
           </Typography>
           <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
-            Create administrative accounts, assign operational branch mappings, and monitor access sessions
+            Provision access, suspend employees, and enforce IAM security protocols
           </Typography>
         </Box>
         <Button 
           variant="contained" 
           color="primary" 
-          onClick={() => setAddOpen(true)}
-          startIcon={<Plus size={16} />}
+          startIcon={<UserPlus size={18} />}
+          onClick={handleOpenCreate}
           sx={{ borderRadius: 2 }}
         >
-          Create User account
+          Provision New User
         </Button>
       </Box>
 
-      {/* Users table */}
-      <TableContainer component={Card}>
-        <Table size="medium">
-          <TableHead>
-            <TableRow>
-              <TableCell sx={{ fontWeight: 700 }}>Account Member</TableCell>
-              <TableCell sx={{ fontWeight: 700 }}>Contact Email</TableCell>
-              <TableCell sx={{ fontWeight: 700 }}>System Role</TableCell>
-              <TableCell sx={{ fontWeight: 700 }}>Mapped Branch</TableCell>
-              <TableCell sx={{ fontWeight: 700 }}>Last Active</TableCell>
-              <TableCell sx={{ fontWeight: 700 }} align="center">Actions</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {users.map((u) => (
-              <TableRow key={u.id} hover>
-                <TableCell sx={{ fontWeight: 700 }}>{u.name}</TableCell>
-                <TableCell>{u.email}</TableCell>
-                <TableCell>
-                  <Chip 
-                    label={u.role} 
-                    size="small" 
-                    color={u.role === 'Super Admin' ? 'primary' : 'secondary'}
-                    sx={{ fontWeight: 700, borderRadius: '6px' }}
-                  />
-                </TableCell>
-                <TableCell>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
-                    <Store size={14} color={theme.palette.text.secondary} />
-                    <Typography variant="body2">{u.outlet}</Typography>
-                  </Box>
-                </TableCell>
-                <TableCell>
-                  <Typography variant="body2" sx={{ color: u.lastActive === 'Active now' ? 'success.main' : 'text.secondary', fontWeight: u.lastActive === 'Active now' ? 700 : 500 }}>
-                    {u.lastActive}
-                  </Typography>
-                </TableCell>
-                <TableCell align="center">
-                  <Box sx={{ display: 'flex', justifyContent: 'center', gap: 0.5 }}>
-                    <IconButton 
-                      size="small" 
-                      color="primary"
-                      onClick={() => handleViewProfile(u)}
-                    >
-                      <Eye size={15} />
-                    </IconButton>
-                    <IconButton 
-                      size="small" 
-                      color="error" 
-                      disabled={u.email === currentUser?.email}
-                      onClick={() => handleDeleteUser(u.id, u.name)}
-                    >
-                      <Trash2 size={15} />
-                    </IconButton>
-                  </Box>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
+      {/* Top stats */}
+      <Grid container spacing={3.5} sx={{ mb: 4 }}>
+        {[
+          { title: 'Total Registered Accounts', val: users.length, color: '#0D9488', icon: <UsersIcon size={22} /> },
+          { title: 'Active System Administrators', val: users.filter(u=>u.role==='Admin').length, color: '#F59E0B', icon: <Shield size={22} /> },
+          { title: 'Suspended Accounts', val: users.filter(u=>u.status!=='Active').length, color: '#E11D48', icon: <UserX size={22} /> }
+        ].map((stat, i) => (
+          <Grid item xs={12} md={4} key={i}>
+            <Card sx={{ height: '100%', display: 'flex', alignItems: 'center' }}>
+              <CardContent sx={{ p: 3, display: 'flex', alignItems: 'center', gap: 2.5, width: '100%' }}>
+                <Box sx={{ p: 2, borderRadius: 3, bgcolor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)', color: stat.color }}>
+                  {stat.icon}
+                </Box>
+                <Box>
+                  <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>{stat.title}</Typography>
+                  <Typography variant="h5" sx={{ fontFamily: 'Outfit', fontWeight: 800, mt: 0.5 }}>{stat.val}</Typography>
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+        ))}
+      </Grid>
 
-      {/* Create User Dialog */}
-      <Dialog open={addOpen} onClose={() => setAddOpen(false)} PaperProps={{ sx: { borderRadius: 4, width: 400 } }}>
-        <form onSubmit={handleCreateUser}>
-          <DialogTitle sx={{ fontFamily: 'Outfit', fontWeight: 'bold' }}>Register Admin Account</DialogTitle>
+      <Card>
+        <CardContent sx={{ p: 0 }}>
+          <Box sx={{ p: 2.5, borderBottom: `1px solid ${theme.palette.divider}`, display: 'flex', justifyContent: 'flex-end' }}>
+            <Box sx={{ position: 'relative', width: 280 }}>
+              <Search size={16} style={{ position: 'absolute', top: 12, left: 12, color: theme.palette.text.secondary }} />
+              <TextField 
+                size="small" 
+                fullWidth 
+                placeholder="Search by name, email or role..." 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                sx={{ '& .MuiOutlinedInput-root': { pl: 4, borderRadius: 2 } }}
+              />
+            </Box>
+          </Box>
+          <TableContainer>
+            {loading ? (
+               <Box sx={{ display: 'flex', justifyContent: 'center', py: 5 }}><CircularProgress /></Box>
+            ) : (
+            <Table>
+              <TableHead>
+                <TableRow sx={{ bgcolor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.01)' }}>
+                  <TableCell sx={{ fontWeight: 700 }}>Employee Details</TableCell>
+                  <TableCell sx={{ fontWeight: 700 }}>Role / Permission Tier</TableCell>
+                  <TableCell sx={{ fontWeight: 700 }}>Department</TableCell>
+                  <TableCell sx={{ fontWeight: 700 }}>IAM Status</TableCell>
+                  <TableCell sx={{ fontWeight: 700 }}>Last Login Auth</TableCell>
+                  <TableCell sx={{ fontWeight: 700 }} align="right">Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {filteredUsers.map(user => (
+                  <TableRow key={user.id} hover>
+                    <TableCell>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        <Avatar sx={{ width: 34, height: 34, fontSize: '0.9rem', bgcolor: theme.palette.primary.main }}>
+                          {user.name.charAt(0)}
+                        </Avatar>
+                        <Box>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>{user.name}</Typography>
+                          <Typography variant="caption" sx={{ color: 'text.secondary' }}>{user.email}</Typography>
+                        </Box>
+                      </Box>
+                    </TableCell>
+                    <TableCell>
+                      <Chip 
+                        label={user.role} 
+                        size="small" 
+                        variant="outlined"
+                        color={user.role === 'Admin' ? 'secondary' : user.role === 'Manager' ? 'info' : 'default'}
+                        sx={{ fontWeight: 600, height: 22, fontSize: '0.7rem' }} 
+                      />
+                    </TableCell>
+                    <TableCell><Typography variant="body2">{user.department}</Typography></TableCell>
+                    <TableCell>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        {user.status === 'Active' ? <UserCheck size={14} color="#10B981" /> : <UserX size={14} color="#E11D48" />}
+                        <Typography variant="caption" sx={{ fontWeight: 700, color: user.status === 'Active' ? '#10B981' : '#E11D48' }}>
+                          {user.status}
+                        </Typography>
+                      </Box>
+                    </TableCell>
+                    <TableCell><Typography variant="body2" sx={{ color: 'text.secondary' }}>{user.lastActive}</Typography></TableCell>
+                    <TableCell align="right">
+                      <Tooltip title="Edit IAM Profile">
+                        <IconButton size="small" color="primary"><FileEdit size={16} /></IconButton>
+                      </Tooltip>
+                      <Tooltip title="Revoke Access (Terminate)">
+                        <IconButton size="small" color="error" sx={{ ml: 0.5 }}><Trash2 size={16} /></IconButton>
+                      </Tooltip>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {filteredUsers.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={6} align="center" sx={{ py: 3, color: 'text.secondary' }}>
+                      No user accounts found matching that query.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+            )}
+          </TableContainer>
+        </CardContent>
+      </Card>
+
+      {/* User Create/Edit Dialog */}
+      <Dialog open={userModalOpen} onClose={() => setUserModalOpen(false)} PaperProps={{ sx: { borderRadius: 3, width: 450 } }}>
+        <form onSubmit={handleUserSubmit}>
+          <DialogTitle sx={{ fontFamily: 'Outfit', fontWeight: 700 }}>
+            {modalMode === 'create' ? 'Provision New User' : 'Edit IAM Profile'}
+          </DialogTitle>
           <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, pt: 1.5 }}>
             <TextField
-              fullWidth
               size="small"
+              fullWidth
               label="Full Name"
               value={uName}
-              onChange={(e) => setUName(e.target.value)}
+              onChange={e => setUName(e.target.value)}
               required
             />
             <TextField
-              fullWidth
               size="small"
+              fullWidth
               type="email"
-              label="Email Address"
+              label="Corporate Email Address"
               value={uEmail}
-              onChange={(e) => setUEmail(e.target.value)}
+              onChange={e => setUEmail(e.target.value)}
               required
             />
             <FormControl fullWidth size="small">
-              <InputLabel>Assign Role</InputLabel>
+              <InputLabel>Permission Role Tier</InputLabel>
               <Select
                 value={uRole}
-                label="Assign Role"
-                onChange={(e) => setURole(e.target.value as Role)}
+                label="Permission Role Tier"
+                onChange={e => setURole(e.target.value)}
               >
-                <MenuItem value="Super Admin">Super Admin</MenuItem>
-                <MenuItem value="Admin">Admin</MenuItem>
-                <MenuItem value="Outlet Manager">Outlet Manager</MenuItem>
-                <MenuItem value="Kitchen Manager">Kitchen Manager</MenuItem>
-                <MenuItem value="Delivery Manager">Delivery Manager</MenuItem>
-                <MenuItem value="Finance Manager">Finance Manager</MenuItem>
-                <MenuItem value="Inventory Manager">Inventory Manager</MenuItem>
-                <MenuItem value="Customer Support">Customer Support</MenuItem>
-                <MenuItem value="Marketing Manager">Marketing Manager</MenuItem>
-              </Select>
-            </FormControl>
-
-            <FormControl fullWidth size="small">
-              <InputLabel>Outlet Scope</InputLabel>
-              <Select
-                value={uOutlet}
-                label="Outlet Scope"
-                onChange={(e) => setUOutlet(e.target.value)}
-              >
-                <MenuItem value="all">All Outlets (Global)</MenuItem>
-                {outlets.map(o => <MenuItem key={o.id} value={o.id}>{o.name}</MenuItem>)}
+                <MenuItem value="Admin">System Administrator</MenuItem>
+                <MenuItem value="Manager">Operations Manager</MenuItem>
+                <MenuItem value="Staff">Support Staff</MenuItem>
               </Select>
             </FormControl>
           </DialogContent>
-          <DialogActions sx={{ p: 2 }}>
-            <Button onClick={() => setAddOpen(false)}>Cancel</Button>
-            <Button type="submit" variant="contained" color="primary">Create User</Button>
+          <DialogActions sx={{ p: 2.5 }}>
+            <Button onClick={() => setUserModalOpen(false)} color="inherit">Cancel</Button>
+            <Button type="submit" variant="contained" color="primary">
+              {modalMode === 'create' ? 'Provision Account' : 'Save Changes'}
+            </Button>
           </DialogActions>
         </form>
-      </Dialog>
-
-      {/* View User Profile Dialog */}
-      <Dialog 
-        open={isProfileOpen} 
-        onClose={() => { setIsProfileOpen(false); setSelectedUser(null); }} 
-        PaperProps={{ sx: { borderRadius: 4, width: 440 } }}
-      >
-        {selectedUser && (
-          <>
-            <DialogTitle sx={{ fontFamily: 'Outfit', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 1 }}>
-              <ShieldCheck size={20} style={{ color: theme.palette.primary.main }} />
-              Admin Member Profile
-            </DialogTitle>
-            <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, pt: 1 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, bgcolor: 'rgba(27,67,50,0.04)', p: 2.5, borderRadius: 3 }}>
-                <Avatar sx={{ bgcolor: 'primary.main', width: 52, height: 52, fontSize: '1.2rem', fontWeight: 800 }}>
-                  {selectedUser.name.charAt(0)}
-                </Avatar>
-                <Box>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 800, fontFamily: 'Outfit' }}>{selectedUser.name}</Typography>
-                  <Typography variant="body2" sx={{ color: 'text.secondary' }}>{selectedUser.email}</Typography>
-                  <Chip label={selectedUser.role} size="small" color="primary" sx={{ mt: 0.5, fontWeight: 700, borderRadius: 1 }} />
-                </Box>
-              </Box>
-              
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                <Box>
-                  <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, display: 'block' }}>ACCOUNT MEMBER ID</Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 700 }}>{selectedUser.id}</Typography>
-                </Box>
-                <Divider />
-                <Box>
-                  <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, display: 'block' }}>MAPPED OPERATIONAL SCOPE</Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 700 }}>{selectedUser.outlet}</Typography>
-                </Box>
-                <Divider />
-                <Box>
-                  <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, display: 'block' }}>LAST SESSION ACTIVE</Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 700, color: selectedUser.lastActive === 'Active now' ? 'success.main' : 'text.primary' }}>
-                    {selectedUser.lastActive}
-                  </Typography>
-                </Box>
-                <Divider />
-                <Box>
-                  <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, display: 'block' }}>ACCESS PROFILE SIGNATURE</Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.secondary', fontSize: '0.8rem' }}>
-                    IP: 192.168.1.{Math.floor(10 + Math.random() * 80)} | Browser: Admin Web Session
-                  </Typography>
-                </Box>
-              </Box>
-            </DialogContent>
-            <DialogActions sx={{ p: 2 }}>
-              <Button onClick={() => { setIsProfileOpen(false); setSelectedUser(null); }}>Close Profile</Button>
-            </DialogActions>
-          </>
-        )}
       </Dialog>
     </Box>
   );

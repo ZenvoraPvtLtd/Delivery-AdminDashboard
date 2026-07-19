@@ -1,28 +1,39 @@
-import React, { useState } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useDispatch } from 'react-redux';
 import { 
   Box, Typography, Card, CardContent, Grid, Button, Table, 
   TableBody, TableCell, TableContainer, TableHead, TableRow, 
   Chip, Avatar, Rating, IconButton, Dialog, DialogTitle, 
   DialogContent, DialogActions, TextField, FormControl, 
-  InputLabel, Select, MenuItem, useTheme, Tooltip 
+  InputLabel, Select, MenuItem, useTheme, Tooltip, CircularProgress, Pagination 
 } from '@mui/material';
 import { 
   Bike, ShieldCheck, ShieldAlert, Plus, Compass, 
   Calendar, Phone, MapPin, UserPlus2, UserCheck
 } from 'lucide-react';
-import { RootState, DeliveryPartner, addEditRider, addAuditLog, addNotification } from '../store';
+import { addNotification } from '../store';
+import { deliveryPartnerService, DeliveryPartner, DeliveryPartnerStats } from '../services/deliveryPartnerService';
 
 const DeliveryPartners: React.FC = () => {
   const theme = useTheme();
   const dispatch = useDispatch();
 
-  const currentUser = useSelector((state: RootState) => state.auth.user);
-  const riders = useSelector((state: RootState) => state.db.deliveryPartners);
-  const orders = useSelector((state: RootState) => state.db.orders);
+  const [riders, setRiders] = useState<DeliveryPartner[]>([]);
+  const [stats, setStats] = useState<DeliveryPartnerStats>({
+    total_riders: 0,
+    available_riders: 0,
+    busy_riders: 0,
+    offline_riders: 0
+  });
+  
+  const [loading, setLoading] = useState(true);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const size = 10;
 
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'All' | typeof riders[0]['status']>('All');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('All');
   
   const [addOpen, setAddOpen] = useState(false);
   const [newRiderName, setNewRiderName] = useState('');
@@ -30,117 +41,92 @@ const DeliveryPartners: React.FC = () => {
   const [newRiderVehicle, setNewRiderVehicle] = useState<'Bike' | 'Scooter' | 'E-Bike'>('Bike');
   const [newRiderPlate, setNewRiderPlate] = useState('');
 
-  const filteredRiders = riders.filter(r => {
-    const matchesSearch = r.name.toLowerCase().includes(search.toLowerCase()) || r.phone.includes(search);
-    const matchesStatus = statusFilter === 'All' || r.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 500);
+    return () => clearTimeout(timer);
+  }, [search]);
 
-  const handleVerifyLicense = (riderId: string) => {
-    const rider = riders.find(r => r.id === riderId);
-    if (!rider) return;
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const [res, statsRes] = await Promise.all([
+        deliveryPartnerService.getPartners(page, size, debouncedSearch, statusFilter),
+        deliveryPartnerService.getSummaryStats()
+      ]);
+      setRiders(res.data);
+      setTotal(res.total);
+      setStats(statsRes);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  }, [page, size, debouncedSearch, statusFilter]);
 
-    const updatedRider = {
-      ...rider,
-      licenseVerified: !rider.licenseVerified
-    };
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
-    dispatch(addEditRider(updatedRider));
-
-    dispatch(addNotification({
-      title: 'Rider Compliance Update',
-      description: `${rider.name}'s license verification set to ${!rider.licenseVerified}`,
-      type: 'system'
-    }));
-
-    dispatch(addAuditLog({
-      username: currentUser?.email || 'Simulator Client',
-      role: currentUser?.role || 'Guest',
-      action: `Toggled license verification for rider ${rider.name}`,
-      module: 'Delivery Partners',
-      ipAddress: '127.0.0.1',
-      browser: 'Admin Console'
-    }));
+  const handleVerifyLicense = async (riderId: string, currentStatus: boolean, name: string) => {
+    try {
+      await deliveryPartnerService.verifyLicense(riderId, !currentStatus);
+      dispatch(addNotification({
+        title: 'Rider Compliance Update',
+        description: `${name}'s license verification set to ${!currentStatus}`,
+        type: 'system'
+      }));
+      fetchData();
+    } catch (error) {
+      console.error(error);
+    }
   };
 
-  const handleToggleDuty = (riderId: string) => {
-    const rider = riders.find(r => r.id === riderId);
-    if (!rider) return;
-
-    const nextStatus: DeliveryPartner['status'] = rider.status === 'Offline' ? 'Available' : 'Offline';
-
-    const updatedRider = {
-      ...rider,
-      status: nextStatus
-    };
-
-    dispatch(addEditRider(updatedRider));
-
-    dispatch(addNotification({
-      title: 'Rider Duty Shift',
-      description: `${rider.name} is now ${nextStatus}`,
-      type: 'system'
-    }));
-
-    dispatch(addAuditLog({
-      username: currentUser?.email || 'Simulator Client',
-      role: currentUser?.role || 'Guest',
-      action: `Toggled duty shift for rider ${rider.name} to ${nextStatus}`,
-      module: 'Delivery Partners',
-      ipAddress: '127.0.0.1',
-      browser: 'Admin Console'
-    }));
+  const handleToggleDuty = async (riderId: string, currentStatus: string, name: string) => {
+    try {
+      const nextStatus = currentStatus === 'Offline' ? 'Available' : 'Offline';
+      await deliveryPartnerService.updateDutyStatus(riderId, nextStatus);
+      dispatch(addNotification({
+        title: 'Rider Duty Shift',
+        description: `${name} is now ${nextStatus}`,
+        type: 'system'
+      }));
+      fetchData();
+    } catch (error) {
+      console.error(error);
+    }
   };
 
-  const handleAddRiderSubmit = () => {
+  const handleAddRiderSubmit = async () => {
     if (!newRiderName || !newRiderPhone || !newRiderPlate) return;
 
-    const newRider = {
-      id: `rider-${Date.now().toString().slice(-3)}`,
-      name: newRiderName,
-      phone: newRiderPhone,
-      vehicleType: newRiderVehicle,
-      vehicleNumber: newRiderPlate,
-      licenseVerified: true,
-      insuranceExpiry: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      status: 'Available' as const,
-      rating: 5.0,
-      earnings: 0.0,
-      latitude: 40.7128,
-      longitude: -74.0060,
-      avatar: `https://images.unsplash.com/photo-${1500000000000 + Math.floor(Math.random() * 100000)}?w=100`
-    };
+    try {
+      await deliveryPartnerService.createPartner({
+        full_name: newRiderName,
+        mobile_number: newRiderPhone,
+        vehicle_type: newRiderVehicle,
+        vehicle_number: newRiderPlate
+      });
 
-    dispatch(addEditRider(newRider));
+      dispatch(addNotification({
+        title: 'New Rider Registered',
+        description: `${newRiderName} added to the dispatch fleet.`,
+        type: 'system'
+      }));
 
-    dispatch(addNotification({
-      title: 'New Rider Registered',
-      description: `${newRiderName} added to the dispatch fleet.`,
-      type: 'system'
-    }));
-
-    dispatch(addAuditLog({
-      username: currentUser?.email || 'Simulator Client',
-      role: currentUser?.role || 'Guest',
-      action: `Registered new delivery partner ${newRiderName}`,
-      module: 'Delivery Partners',
-      ipAddress: '127.0.0.1',
-      browser: 'Admin Console'
-    }));
-
-    // Reset Form
-    setAddOpen(false);
-    setNewRiderName('');
-    setNewRiderPhone('');
-    setNewRiderPlate('');
+      setAddOpen(false);
+      setNewRiderName('');
+      setNewRiderPhone('');
+      setNewRiderPlate('');
+      fetchData();
+    } catch (error) {
+      console.error(error);
+    }
   };
 
-  // Find dispatch locations for map visualization
   const activeDispatches = riders.filter(r => r.status === 'On Delivery');
 
   return (
     <Box>
-      {/* Title */}
       <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Box>
           <Typography variant="h4" sx={{ fontFamily: 'Outfit', fontWeight: 800 }}>
@@ -161,14 +147,13 @@ const DeliveryPartners: React.FC = () => {
         </Button>
       </Box>
 
-      {/* Analytics stats row */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
         <Grid item xs={12} sm={4}>
           <Card>
             <CardContent sx={{ p: 2.5 }}>
               <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', fontWeight: 600 }}>Total Fleet Size</Typography>
-              <Typography variant="h5" sx={{ fontFamily: 'Outfit', fontWeight: 800, mt: 0.5 }}>{riders.length} Riders</Typography>
-              <Typography variant="caption" sx={{ color: 'text.secondary' }}>Across 3 vehicle formats</Typography>
+              <Typography variant="h5" sx={{ fontFamily: 'Outfit', fontWeight: 800, mt: 0.5 }}>{stats.total_riders} Riders</Typography>
+              <Typography variant="caption" sx={{ color: 'text.secondary' }}>Across all vehicle formats</Typography>
             </CardContent>
           </Card>
         </Grid>
@@ -177,10 +162,10 @@ const DeliveryPartners: React.FC = () => {
             <CardContent sx={{ p: 2.5 }}>
               <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', fontWeight: 600 }}>On-Duty Riders</Typography>
               <Typography variant="h5" sx={{ fontFamily: 'Outfit', fontWeight: 800, mt: 0.5 }}>
-                {riders.filter(r => r.status !== 'Offline').length} Active
+                {stats.available_riders + stats.busy_riders} Active
               </Typography>
               <Typography variant="caption" sx={{ color: 'success.main', fontWeight: 600 }}>
-                {activeDispatches.length} carrying deliveries
+                {stats.busy_riders} carrying deliveries
               </Typography>
             </CardContent>
           </Card>
@@ -200,7 +185,6 @@ const DeliveryPartners: React.FC = () => {
       </Grid>
 
       <Grid container spacing={3.5}>
-        {/* Fleet roster table */}
         <Grid item xs={12} lg={8}>
           <Card>
             <CardContent sx={{ p: 2.5 }}>
@@ -221,7 +205,7 @@ const DeliveryPartners: React.FC = () => {
                     <Select
                       value={statusFilter}
                       label="Duty Status"
-                      onChange={(e) => setStatusFilter(e.target.value as any)}
+                      onChange={(e) => setStatusFilter(e.target.value)}
                     >
                       <MenuItem value="All">All statuses</MenuItem>
                       <MenuItem value="Available">Available</MenuItem>
@@ -233,226 +217,165 @@ const DeliveryPartners: React.FC = () => {
               </Box>
 
               <TableContainer sx={{ maxHeight: 420 }}>
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell sx={{ fontWeight: 700 }}>Rider Account</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }}>Vehicle Details</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }}>Compliance</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }} align="right">Earnings</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }} align="center">Duty</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {filteredRiders.map((rider) => (
-                      <TableRow key={rider.id} hover>
-                        <TableCell>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                            <Avatar src={rider.avatar} sx={{ width: 34, height: 34 }} />
-                            <Box>
-                              <Typography variant="body2" sx={{ fontWeight: 600 }}>{rider.name}</Typography>
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                <Phone size={11} color={theme.palette.text.secondary} />
-                                <Typography variant="caption" sx={{ color: 'text.secondary' }}>{rider.phone}</Typography>
+                {loading ? (
+                   <Box sx={{ p: 4, textAlign: 'center' }}><CircularProgress /></Box>
+                ) : (
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell sx={{ fontWeight: 700 }}>Rider Account</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }}>Compliance</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }} align="right">Earnings</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }} align="center">Duty</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {riders.map((rider) => (
+                        <TableRow key={rider.id} hover>
+                          <TableCell>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                              <Avatar src={`https://api.dicebear.com/7.x/initials/svg?seed=${rider.full_name}`} sx={{ width: 36, height: 36 }} />
+                              <Box>
+                                <Typography variant="body2" sx={{ fontWeight: 700 }}>{rider.full_name}</Typography>
+                                <Typography variant="caption" sx={{ color: 'text.secondary', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                  <Phone size={11} /> {rider.mobile_number}
+                                </Typography>
                               </Box>
                             </Box>
-                          </Box>
-                        </TableCell>
-                        <TableCell>
-                          <Typography variant="body2" sx={{ fontWeight: 600 }}>{rider.vehicleType}</Typography>
-                          <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>{rider.vehicleNumber}</Typography>
-                        </TableCell>
-                        <TableCell>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            {rider.licenseVerified ? (
-                              <Chip 
-                                size="small"
-                                label="License Ok" 
-                                color="success" 
-                                variant="outlined"
-                                icon={<ShieldCheck size={12} />}
-                                onClick={() => handleVerifyLicense(rider.id)}
-                                sx={{ height: 20, fontSize: '0.65rem', fontWeight: 600, cursor: 'pointer' }}
-                              />
-                            ) : (
-                              <Chip 
-                                size="small"
-                                label="Verification Pending" 
-                                color="error" 
-                                variant="outlined"
-                                icon={<ShieldAlert size={12} />}
-                                onClick={() => handleVerifyLicense(rider.id)}
-                                sx={{ height: 20, fontSize: '0.65rem', fontWeight: 600, cursor: 'pointer' }}
-                              />
-                            )}
-                          </Box>
-                        </TableCell>
-                        <TableCell align="right" sx={{ fontWeight: 700 }}>
-                          ${rider.earnings.toFixed(2)}
-                        </TableCell>
-                        <TableCell>
-                          <Chip 
-                            label={rider.status} 
-                            size="small" 
-                            sx={{ 
-                              fontWeight: 700,
-                              fontSize: '0.65rem',
-                              borderRadius: '6px',
-                              bgcolor: 
-                                rider.status === 'Available' ? 'rgba(16, 185, 129, 0.1)' :
-                                rider.status === 'On Delivery' ? 'rgba(79, 70, 229, 0.1)' : 'rgba(148, 163, 184, 0.1)',
-                              color:
-                                rider.status === 'Available' ? 'success.main' :
-                                rider.status === 'On Delivery' ? 'secondary.main' : 'text.secondary',
-                            }}
-                          />
-                        </TableCell>
-                        <TableCell align="center">
-                          <Tooltip title={rider.status === 'Offline' ? "Clock In Shift" : "Clock Out Shift"}>
-                            <IconButton 
+                          </TableCell>
+                          <TableCell>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <Tooltip title={rider.license_verified ? "License Verified" : "License Missing"}>
+                                <IconButton 
+                                  size="small" 
+                                  color={rider.license_verified ? 'success' : 'error'}
+                                  onClick={() => handleVerifyLicense(rider.id, rider.license_verified, rider.full_name)}
+                                >
+                                  {rider.license_verified ? <ShieldCheck size={16} /> : <ShieldAlert size={16} />}
+                                </IconButton>
+                              </Tooltip>
+                            </Box>
+                          </TableCell>
+                          <TableCell align="right" sx={{ fontWeight: 700 }}>
+                            ${rider.total_earnings.toFixed(2)}
+                          </TableCell>
+                          <TableCell>
+                            <Chip 
+                              label={rider.status}
                               size="small"
-                              onClick={() => handleToggleDuty(rider.id)}
-                              disabled={rider.status === 'On Delivery'}
-                              color="secondary"
+                              sx={{ 
+                                fontWeight: 700, 
+                                borderRadius: '6px',
+                                bgcolor: rider.status === 'Available' ? 'success.light' : 
+                                         rider.status === 'On Delivery' ? 'warning.light' : 'action.disabledBackground',
+                                color: rider.status === 'Available' ? 'success.dark' : 
+                                       rider.status === 'On Delivery' ? 'warning.dark' : 'text.secondary'
+                              }}
+                            />
+                          </TableCell>
+                          <TableCell align="center">
+                            <Button 
+                              variant={rider.status !== 'Offline' ? "outlined" : "contained"}
+                              size="small"
+                              color={rider.status !== 'Offline' ? "error" : "primary"}
+                              onClick={() => handleToggleDuty(rider.id, rider.status, rider.full_name)}
+                              sx={{ textTransform: 'none', borderRadius: 2, minWidth: 90 }}
                             >
-                              <UserCheck size={16} />
-                            </IconButton>
-                          </Tooltip>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                              {rider.status !== 'Offline' ? 'Go Offline' : 'Go Online'}
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
               </TableContainer>
+              <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center' }}>
+                <Pagination count={Math.ceil(total / size) || 1} page={page} onChange={(_, p) => setPage(p)} color="primary" />
+              </Box>
             </CardContent>
           </Card>
         </Grid>
 
-        {/* Live GPS locator panel */}
         <Grid item xs={12} lg={4}>
-          <Card sx={{ height: '100%' }}>
-            <CardContent sx={{ p: 3, display: 'flex', flexDirection: 'column', gap: 2.5 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Compass size={18} color={theme.palette.primary.main} />
-                <Typography variant="h6" sx={{ fontFamily: 'Outfit', fontWeight: 700 }}>
-                  Active Dispatch Map
+          <Card sx={{ height: '100%', minHeight: 400 }}>
+            <CardContent sx={{ p: 2.5, display: 'flex', flexDirection: 'column', height: '100%' }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 700, fontFamily: 'Outfit', mb: 2 }}>
+                Live Tracking Monitor
+              </Typography>
+              <Box sx={{ 
+                flexGrow: 1, 
+                bgcolor: theme.palette.mode === 'dark' ? '#1a2027' : '#f5f5f5', 
+                borderRadius: 2, 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center',
+                flexDirection: 'column',
+                gap: 2,
+                position: 'relative',
+                overflow: 'hidden',
+                minHeight: 250
+              }}>
+                <MapPin size={48} color={theme.palette.text.disabled} opacity={0.5} />
+                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                  Live map interface will render here
                 </Typography>
-              </Box>
 
-              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                Operational view of riders executing food dispatches.
-              </Typography>
-
-              {/* Premium Interactive OpenStreetMap Map Integration */}
-              <Box 
-                sx={{ 
-                  height: 240, 
-                  borderRadius: 3.5, 
-                  border: `1px solid ${theme.palette.divider}`,
-                  position: 'relative',
-                  overflow: 'hidden'
-                }}
-              >
-                <iframe 
-                  title="Interactive Map"
-                  width="100%" 
-                  height="100%" 
-                  frameBorder="0" 
-                  scrolling="no" 
-                  marginHeight={0} 
-                  marginWidth={0} 
-                  src="https://www.openstreetmap.org/export/embed.html?bbox=-74.0150%2C40.7080%2C-73.9950%2C40.7180&amp;layer=mapnik&amp;marker=40.7128%2C-74.0060"
-                  style={{ border: 0, filter: theme.palette.mode === 'dark' ? 'invert(90%) hue-rotate(180deg)' : 'none' }}
-                />
-                {/* Center Store Pin Overlay */}
-                <Box sx={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 3, pointerEvents: 'none' }}>
-                  <MapPin size={22} color="#047857" fill="#047857" />
-                  <Typography variant="caption" sx={{ fontSize: '0.6rem', fontWeight: 800, bgcolor: 'background.paper', px: 0.5, py: 0.1, borderRadius: 0.5, border: `1px solid ${theme.palette.divider}` }}>Branch Hub</Typography>
-                </Box>
-
-                {/* Draw active dispatches overlay */}
-                {activeDispatches.map((r, idx) => {
-                  // Compute coordinate screen values relative to hub
-                  const screenX = 50 + (r.longitude - (-74.0060)) * 1200;
-                  const screenY = 50 - (r.latitude - 40.7128) * 1200;
-                  return (
-                    <Box 
-                      key={r.id} 
+                {activeDispatches.map((r, i) => (
+                  <Tooltip key={r.id} title={`${r.full_name} - On Delivery`}>
+                    <Avatar 
+                      src={`https://api.dicebear.com/7.x/initials/svg?seed=${r.full_name}`}
                       sx={{ 
+                        width: 28, height: 28, 
                         position: 'absolute', 
-                        left: `${Math.max(15, Math.min(85, screenX))}%`, 
-                        top: `${Math.max(15, Math.min(85, screenY))}%`, 
-                        transform: 'translate(-50%, -50%)', 
-                        display: 'flex', 
-                        flexDirection: 'column', 
-                        alignItems: 'center',
-                        zIndex: 2,
-                        pointerEvents: 'none'
-                      }}
-                    >
-                      <Box sx={{ p: 0.6, bgcolor: 'success.main', borderRadius: '50%', boxShadow: '0 2px 8px rgba(0,0,0,0.3)', display: 'flex' }}>
-                        <Bike size={13} color="white" />
-                      </Box>
-                      <Typography variant="caption" sx={{ fontSize: '0.55rem', fontWeight: 700, bgcolor: 'background.paper', px: 0.4, borderRadius: 0.5 }}>
-                        {r.name.split(' ')[0]}
-                      </Typography>
-                    </Box>
-                  );
-                })}
+                        top: `${30 + (i * 15)}%`, 
+                        left: `${40 + (i * 20)}%`,
+                        border: `2px solid ${theme.palette.warning.main}`,
+                        boxShadow: 3
+                      }} 
+                    />
+                  </Tooltip>
+                ))}
               </Box>
-              <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', textAlign: 'center' }}>
-                Interactive GIS map overlay showing branch hubs and live dispatch lanes.
-              </Typography>
             </CardContent>
           </Card>
         </Grid>
       </Grid>
 
-      {/* Add Rider Dialog */}
-      <Dialog open={addOpen} onClose={() => setAddOpen(false)} PaperProps={{ sx: { borderRadius: 3, width: 400 } }}>
-        <DialogTitle sx={{ fontFamily: 'Outfit', fontWeight: 'bold' }}>Add Delivery Partner</DialogTitle>
-        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, pt: 1.5 }}>
+      <Dialog open={addOpen} onClose={() => setAddOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontFamily: 'Outfit', fontWeight: 700 }}>Register New Delivery Partner</DialogTitle>
+        <DialogContent dividers sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, pt: 2 }}>
           <TextField
-            fullWidth
-            size="small"
-            label="Rider Name"
+            label="Full Name"
+            fullWidth size="small"
             value={newRiderName}
             onChange={(e) => setNewRiderName(e.target.value)}
-            placeholder="e.g. Samuel Jackson"
           />
           <TextField
-            fullWidth
-            size="small"
             label="Phone Number"
+            fullWidth size="small"
             value={newRiderPhone}
             onChange={(e) => setNewRiderPhone(e.target.value)}
-            placeholder="+1 555-xxxx"
           />
           <FormControl fullWidth size="small">
             <InputLabel>Vehicle Type</InputLabel>
-            <Select
-              value={newRiderVehicle}
-              label="Vehicle Type"
-              onChange={(e) => setNewRiderVehicle(e.target.value as any)}
-            >
-              <MenuItem value="Bike">Motorcycle</MenuItem>
+            <Select value={newRiderVehicle} label="Vehicle Type" onChange={(e) => setNewRiderVehicle(e.target.value as any)}>
+              <MenuItem value="Bike">Motorcycle / Bike</MenuItem>
               <MenuItem value="Scooter">Scooter</MenuItem>
-              <MenuItem value="E-Bike">Electric Bike</MenuItem>
+              <MenuItem value="E-Bike">Electric Bike (EV)</MenuItem>
             </Select>
           </FormControl>
           <TextField
-            fullWidth
-            size="small"
-            label="License Plate Number"
+            label="License Plate / Registration"
+            fullWidth size="small"
             value={newRiderPlate}
             onChange={(e) => setNewRiderPlate(e.target.value)}
-            placeholder="e.g. MC-9812"
           />
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setAddOpen(false)}>Cancel</Button>
-          <Button onClick={handleAddRiderSubmit} variant="contained" color="primary" disabled={!newRiderName || !newRiderPhone || !newRiderPlate}>
+          <Button onClick={() => setAddOpen(false)} sx={{ textTransform: 'none' }}>Cancel</Button>
+          <Button onClick={handleAddRiderSubmit} variant="contained" sx={{ textTransform: 'none', borderRadius: 2 }}>
             Register Rider
           </Button>
         </DialogActions>

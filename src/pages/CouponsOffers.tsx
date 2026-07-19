@@ -1,25 +1,28 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { 
   Box, Typography, Card, CardContent, Grid, Button, Table, 
   TableBody, TableCell, TableContainer, TableHead, TableRow, 
   Chip, Dialog, DialogTitle, DialogContent, DialogActions, 
   TextField, FormControl, InputLabel, Select, MenuItem, 
-  Switch, FormControlLabel, useTheme, Tabs, Tab, Divider
+  Switch, FormControlLabel, useTheme, Tabs, Tab, CircularProgress
 } from '@mui/material';
-import { Percent, Plus, Clock, Gift, Users, Calendar, Check } from 'lucide-react';
-import { RootState, addEditCoupon, toggleCouponStatus, addAuditLog, addNotification } from '../store';
-import { Coupon } from '../store';
+import { Percent, Plus, Gift, Calendar } from 'lucide-react';
+import { RootState, addAuditLog, addNotification } from '../store';
+import { promotionService, CouponResponse, OfferResponse, CouponCreateRequest } from '../services/promotionService';
 
 const CouponsOffers: React.FC = () => {
   const theme = useTheme();
   const dispatch = useDispatch();
 
   const currentUser = useSelector((state: RootState) => state.auth.user);
-  const coupons = useSelector((state: RootState) => state.db.coupons);
 
-  const [activeTab, setActiveTab] = useState(0); // 0: Coupon Codes, 1: Promotional Offers (Happy Hours, BOGO)
+  const [activeTab, setActiveTab] = useState(0); 
   const [createOpen, setCreateOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  const [coupons, setCoupons] = useState<CouponResponse[]>([]);
+  const [offers, setOffers] = useState<OfferResponse[]>([]);
 
   // Form states
   const [code, setCode] = useState('');
@@ -30,90 +33,116 @@ const CouponsOffers: React.FC = () => {
   const [expiry, setExpiry] = useState('');
   const [targetType, setTargetType] = useState<'All' | 'Outlet-wise' | 'Customer-wise'>('All');
 
-  // Local simulated offers
-  const [offers, setOffers] = useState([
-    { id: 'off-1', name: 'Happy Hour Beverage BOGO', details: 'Buy 1 Get 1 Free on all beverages', schedule: 'Daily 4:00 PM - 7:00 PM', status: 'Active' },
-    { id: 'off-2', name: 'Weekend Family Combo Pack', details: 'Flat $8.00 off on ordering 3+ combo products', schedule: 'Friday to Sunday', status: 'Active' },
-    { id: 'off-3', name: 'Monsoon Special Flash Sale', details: 'Flat 15% discount on fast foods categories', schedule: 'July 1 - July 31', status: 'Paused' }
-  ]);
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const [cRes, oRes] = await Promise.all([
+        promotionService.getCoupons(),
+        promotionService.getOffers()
+      ]);
+      setCoupons(cRes);
+      setOffers(oRes);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  const handleToggleStatus = (id: string, codeName: string) => {
-    dispatch(toggleCouponStatus(id));
-    const coupon = coupons.find(c => c.id === id);
-    if (!coupon) return;
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
-    dispatch(addNotification({
-      title: 'Campaign Status Updated',
-      description: `Coupon ${codeName} is now ${coupon.status === 'Active' ? 'Paused' : 'Active'}`,
-      type: 'system'
-    }));
+  const handleToggleStatus = async (id: string, codeName: string, currentStatus: string) => {
+    try {
+      await promotionService.toggleCouponStatus(id);
+      
+      dispatch(addNotification({
+        title: 'Campaign Status Updated',
+        description: `Coupon ${codeName} is now ${currentStatus === 'Active' ? 'Paused' : 'Active'}`,
+        type: 'system'
+      }));
 
-    dispatch(addAuditLog({
-      username: currentUser?.email || 'Simulator Client',
-      role: currentUser?.role || 'Guest',
-      action: `Toggled coupon status for ${codeName} to ${coupon.status === 'Active' ? 'Paused' : 'Active'}`,
-      module: 'Coupons',
-      ipAddress: '127.0.0.1',
-      browser: 'Admin Console'
-    }));
+      dispatch(addAuditLog({
+        username: currentUser?.email || 'Simulator Client',
+        role: currentUser?.role || 'Guest',
+        action: `Toggled coupon status for ${codeName} to ${currentStatus === 'Active' ? 'Paused' : 'Active'}`,
+        module: 'Coupons',
+        ipAddress: '127.0.0.1',
+        browser: 'Admin Console'
+      }));
+      
+      fetchData();
+    } catch (err) {
+      console.error(err);
+    }
   };
 
-  const handleToggleOffer = (id: string) => {
-    setOffers(offers.map(o => o.id === id ? { ...o, status: o.status === 'Active' ? 'Paused' : 'Active' } : o));
-    
-    dispatch(addNotification({
-      title: 'Offer Campaign Toggled',
-      description: `Promotional campaign set update applied.`,
-      type: 'system'
-    }));
+  const handleToggleOffer = async (id: string) => {
+    try {
+      await promotionService.toggleOfferStatus(id);
+      
+      dispatch(addNotification({
+        title: 'Offer Campaign Toggled',
+        description: `Promotional campaign set update applied.`,
+        type: 'system'
+      }));
+      
+      fetchData();
+    } catch (err) {
+      console.error(err);
+    }
   };
 
-  const handleCreateCouponSubmit = (e: React.FormEvent) => {
+  const handleCreateCouponSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!code || !value || !minOrder || !expiry) return;
 
-    const newCoupon: Coupon = {
-      id: `cpn-${Date.now().toString().slice(-3)}`,
-      code: code.toUpperCase().replace(/\s/g, ''),
-      discountType,
-      value: parseFloat(value),
-      minOrderValue: parseFloat(minOrder),
-      maxDiscount: maxDiscount ? parseFloat(maxDiscount) : undefined,
-      expiryDate: expiry,
-      usageCount: 0,
-      usageLimit: 250,
-      targetType,
-      status: 'Active'
-    };
+    try {
+      const newCoupon: CouponCreateRequest = {
+        code: code.toUpperCase().replace(/\s/g, ''),
+        discountType,
+        value: parseFloat(value),
+        minOrderValue: parseFloat(minOrder),
+        maxDiscount: maxDiscount ? parseFloat(maxDiscount) : undefined,
+        expiryDate: expiry,
+        usageLimit: 250,
+        targetType,
+        status: 'Active'
+      };
 
-    dispatch(addEditCoupon(newCoupon));
+      await promotionService.createCoupon(newCoupon);
 
-    dispatch(addNotification({
-      title: 'Coupon Created successfully',
-      description: `New promo code ${newCoupon.code} is active.`,
-      type: 'system'
-    }));
+      dispatch(addNotification({
+        title: 'Coupon Created successfully',
+        description: `New promo code ${newCoupon.code} is active.`,
+        type: 'system'
+      }));
 
-    dispatch(addAuditLog({
-      username: currentUser?.email || 'Simulator Client',
-      role: currentUser?.role || 'Guest',
-      action: `Created coupon code ${newCoupon.code}`,
-      module: 'Coupons',
-      ipAddress: '127.0.0.1',
-      browser: 'Admin Console'
-    }));
+      dispatch(addAuditLog({
+        username: currentUser?.email || 'Simulator Client',
+        role: currentUser?.role || 'Guest',
+        action: `Created coupon code ${newCoupon.code}`,
+        module: 'Coupons',
+        ipAddress: '127.0.0.1',
+        browser: 'Admin Console'
+      }));
 
-    setCreateOpen(false);
-    setCode('');
-    setValue('');
-    setMinOrder('');
-    setMaxDiscount('');
-    setExpiry('');
+      setCreateOpen(false);
+      setCode('');
+      setValue('');
+      setMinOrder('');
+      setMaxDiscount('');
+      setExpiry('');
+      
+      fetchData();
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   return (
     <Box>
-      {/* Title */}
       <Box sx={{ mb: 3.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Box>
           <Typography variant="h4" sx={{ fontFamily: 'Outfit', fontWeight: 800 }}>
@@ -136,7 +165,6 @@ const CouponsOffers: React.FC = () => {
         )}
       </Box>
 
-      {/* Tabs */}
       <Tabs 
         value={activeTab} 
         onChange={(e, val) => setActiveTab(val)} 
@@ -148,8 +176,11 @@ const CouponsOffers: React.FC = () => {
         <Tab label="Promotional Campaigns & Offers" sx={{ fontWeight: 700 }} />
       </Tabs>
 
-      {activeTab === 0 ? (
-        // TAB 1: Coupon List
+      {loading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}>
+          <CircularProgress />
+        </Box>
+      ) : activeTab === 0 ? (
         <TableContainer component={Card}>
           <Table size="medium">
             <TableHead>
@@ -207,7 +238,7 @@ const CouponsOffers: React.FC = () => {
                       control={
                         <Switch
                           checked={coupon.status === 'Active'}
-                          onChange={() => handleToggleStatus(coupon.id, coupon.code)}
+                          onChange={() => handleToggleStatus(coupon.id, coupon.code, coupon.status)}
                           color="success"
                           size="small"
                         />
@@ -227,11 +258,15 @@ const CouponsOffers: React.FC = () => {
                   </TableCell>
                 </TableRow>
               ))}
+              {coupons.length === 0 && (
+                 <TableRow>
+                   <TableCell colSpan={8} sx={{ textAlign: 'center', py: 3, color: 'text.secondary' }}>No coupons found.</TableCell>
+                 </TableRow>
+              )}
             </TableBody>
           </Table>
         </TableContainer>
       ) : (
-        // TAB 2: Marketing Campaigns
         <Grid container spacing={3.5}>
           {offers.map((offer) => (
             <Grid item xs={12} md={4} key={offer.id}>
@@ -250,123 +285,81 @@ const CouponsOffers: React.FC = () => {
                           color="success"
                         />
                       }
-                      label=""
+                      label={
+                        <Chip 
+                          label={offer.status} 
+                          size="small" 
+                          color={offer.status === 'Active' ? 'success' : 'default'}
+                          sx={{ height: 20, fontSize: '0.65rem', fontWeight: 700 }}
+                        />
+                      }
                     />
                   </Box>
                   <Box>
-                    <Typography variant="h6" sx={{ fontFamily: 'Outfit', fontWeight: 700 }}>{offer.name}</Typography>
-                    <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>{offer.details}</Typography>
+                    <Typography variant="h6" sx={{ fontFamily: 'Outfit', fontWeight: 700, mb: 0.5 }}>{offer.name}</Typography>
+                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>{offer.details}</Typography>
                   </Box>
-                  <Divider />
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'primary.main' }}>
-                    <Clock size={14} />
-                    <Typography variant="caption" sx={{ fontWeight: 700 }}>{offer.schedule}</Typography>
+                  <Box sx={{ mt: 'auto', pt: 2, borderTop: `1px dashed ${theme.palette.divider}`, display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Calendar size={14} color={theme.palette.text.secondary} />
+                    <Typography variant="caption" sx={{ fontWeight: 600 }}>{offer.schedule}</Typography>
                   </Box>
                 </CardContent>
               </Card>
             </Grid>
           ))}
+          {offers.length === 0 && (
+             <Typography variant="body2" sx={{ width: '100%', textAlign: 'center', py: 4, color: 'text.secondary' }}>No offers found.</Typography>
+          )}
         </Grid>
       )}
 
       {/* Create Coupon Dialog */}
-      <Dialog open={createOpen} onClose={() => setCreateOpen(false)} PaperProps={{ sx: { borderRadius: 4, width: 440 } }}>
+      <Dialog open={createOpen} onClose={() => setCreateOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontFamily: 'Outfit', fontWeight: 700 }}>Launch New Campaign</DialogTitle>
         <form onSubmit={handleCreateCouponSubmit}>
-          <DialogTitle sx={{ fontFamily: 'Outfit', fontWeight: 'bold' }}>Create Coupon Code</DialogTitle>
-          <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, pt: 1.5 }}>
-            <TextField
-              fullWidth
-              size="small"
-              label="Coupon Code Name (e.g. MONSOON20)"
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              required
-            />
+          <DialogContent dividers>
             <Grid container spacing={2}>
-              <Grid item xs={6}>
+              <Grid item xs={12} sm={6}>
+                <TextField fullWidth label="Promo Code (e.g. SUMMER20)" value={code} onChange={(e) => setCode(e.target.value)} required size="small" />
+              </Grid>
+              <Grid item xs={12} sm={6}>
                 <FormControl fullWidth size="small">
-                  <InputLabel>Discount Format</InputLabel>
-                  <Select
-                    value={discountType}
-                    label="Discount Format"
-                    onChange={(e) => setDiscountType(e.target.value as any)}
-                  >
+                  <InputLabel>Discount Type</InputLabel>
+                  <Select value={discountType} label="Discount Type" onChange={(e) => setDiscountType(e.target.value as any)}>
                     <MenuItem value="Percentage">Percentage (%)</MenuItem>
-                    <MenuItem value="Flat">Flat Cash ($)</MenuItem>
+                    <MenuItem value="Flat">Flat Amount ($)</MenuItem>
                   </Select>
                 </FormControl>
               </Grid>
-              <Grid item xs={6}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  type="number"
-                  label={discountType === 'Percentage' ? 'Value (%)' : 'Amount ($)'}
-                  value={value}
-                  onChange={(e) => setValue(e.target.value)}
-                  required
-                />
+              <Grid item xs={12} sm={6}>
+                <TextField fullWidth label={`Value ${discountType === 'Percentage' ? '(%)' : '($)'}`} type="number" value={value} onChange={(e) => setValue(e.target.value)} required size="small" />
               </Grid>
-            </Grid>
-
-            <Grid container spacing={2}>
-              <Grid item xs={6}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  type="number"
-                  label="Min Basket Value ($)"
-                  value={minOrder}
-                  onChange={(e) => setMinOrder(e.target.value)}
-                  required
-                />
+              <Grid item xs={12} sm={6}>
+                <TextField fullWidth label="Min Order Value ($)" type="number" value={minOrder} onChange={(e) => setMinOrder(e.target.value)} required size="small" />
               </Grid>
-              <Grid item xs={6}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  type="number"
-                  label="Max Discount Cap ($)"
-                  value={maxDiscount}
-                  onChange={(e) => setMaxDiscount(e.target.value)}
-                  disabled={discountType === 'Flat'}
-                  placeholder="Optional"
-                />
+              {discountType === 'Percentage' && (
+                <Grid item xs={12} sm={6}>
+                  <TextField fullWidth label="Max Discount Cap ($)" type="number" value={maxDiscount} onChange={(e) => setMaxDiscount(e.target.value)} size="small" />
+                </Grid>
+              )}
+              <Grid item xs={12} sm={discountType === 'Percentage' ? 6 : 12}>
+                <TextField fullWidth label="Expiration Date (YYYY-MM-DD)" value={expiry} onChange={(e) => setExpiry(e.target.value)} required size="small" />
               </Grid>
-            </Grid>
-
-            <Grid container spacing={2}>
-              <Grid item xs={6}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  type="date"
-                  label="Expiration Date"
-                  value={expiry}
-                  onChange={(e) => setExpiry(e.target.value)}
-                  InputLabelProps={{ shrink: true }}
-                  required
-                />
-              </Grid>
-              <Grid item xs={6}>
+              <Grid item xs={12}>
                 <FormControl fullWidth size="small">
-                  <InputLabel>Target Scope</InputLabel>
-                  <Select
-                    value={targetType}
-                    label="Target Scope"
-                    onChange={(e) => setTargetType(e.target.value as any)}
-                  >
-                    <MenuItem value="All">All Outlets & Customers</MenuItem>
-                    <MenuItem value="Outlet-wise">Specific Outlets only</MenuItem>
-                    <MenuItem value="Customer-wise">Special loyal customers</MenuItem>
+                  <InputLabel>Targeting Scope</InputLabel>
+                  <Select value={targetType} label="Targeting Scope" onChange={(e) => setTargetType(e.target.value as any)}>
+                    <MenuItem value="All">All Users / Global</MenuItem>
+                    <MenuItem value="Customer-wise">New Customers Only</MenuItem>
+                    <MenuItem value="Outlet-wise">Specific Outlet Launch</MenuItem>
                   </Select>
                 </FormControl>
               </Grid>
             </Grid>
           </DialogContent>
           <DialogActions sx={{ p: 2 }}>
-            <Button onClick={() => setCreateOpen(false)}>Cancel</Button>
-            <Button type="submit" variant="contained" color="primary">Create Campaign</Button>
+            <Button onClick={() => setCreateOpen(false)} color="inherit">Cancel</Button>
+            <Button type="submit" variant="contained" color="primary">Activate Campaign</Button>
           </DialogActions>
         </form>
       </Dialog>

@@ -1,188 +1,72 @@
 import React, { useEffect, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import axios from 'axios';
 import { 
   Grid, Card, CardContent, Typography, Box, Button, ButtonGroup, 
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, 
-  Chip, List, ListItem, ListItemText, LinearProgress, useTheme, Tooltip as MuiTooltip
+  Chip, CircularProgress, useTheme, Tooltip as MuiTooltip
 } from '@mui/material';
 import { 
   TrendingUp, ShoppingCart, DollarSign, Users, AlertTriangle, 
-  Clock, CheckCircle, Navigation, ShieldCheck, Flame
+  Flame
 } from 'lucide-react';
 import { 
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, 
-  BarChart, Bar, PieChart, Pie, Cell, LineChart, Line, Legend
+  BarChart, Bar, PieChart, Pie, Cell
 } from 'recharts';
-import { RootState, simulateRiderMovement, addNotification, addSimulatedOrder } from '../store';
+import { RootState } from '../store';
 import StatCard from '../components/StatCard';
+import { dashboardService, StatCardData, ChartDataPoint, RecentOrderData } from '../services/dashboardService';
 
 const Dashboard: React.FC = () => {
   const theme = useTheme();
-  const dispatch = useDispatch();
-
-  const { activeOutletId, mode } = useSelector((state: RootState) => state.ui);
-  const { orders, products, deliveryPartners, rawMaterials, tickets, outlets } = useSelector((state: RootState) => state.db);
+  
+  const { mode } = useSelector((state: RootState) => state.ui);
 
   const [salesTab, setSalesTab] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
-  const [isStreamActive, setIsStreamActive] = useState(true);
+  const [loading, setLoading] = useState(true);
+  
+  const [cards, setCards] = useState<StatCardData[]>([]);
+  const [chartData, setChartData] = useState<any>(null);
+  const [recentOrders, setRecentOrders] = useState<RecentOrderData[]>([]);
+  const [systemStatus, setSystemStatus] = useState<any>(null);
+  const [notifications, setNotifications] = useState<any[]>([]);
 
-  const handleToggleStream = () => {
-    const newState = !isStreamActive;
-    setIsStreamActive(newState);
-    dispatch(addNotification({
-      title: newState ? 'Live Stream Resumed' : 'Live Stream Paused',
-      description: newState 
-        ? 'Incoming order simulator is now active.' 
-        : 'Incoming order simulator has been paused.',
-      type: 'system'
-    }));
-  };
-
-  // Trigger GPS Simulator loop for active orders map
   useEffect(() => {
-    const gpsTimer = setInterval(() => {
-      dispatch(simulateRiderMovement());
-    }, 4000);
-    return () => clearInterval(gpsTimer);
-  }, [dispatch]);
-
-  // Simulate random orders arriving to demonstrate live notification alerts
-  useEffect(() => {
-    if (!isStreamActive) return;
-
-    const orderTimer = setInterval(() => {
-      // 25% chance of simulating a new order every 8 seconds
-      if (Math.random() < 0.25) {
-        const randomNames = ['Bruce Banner', 'Diana Prince', 'Clark Kent', 'Steve Rogers', 'Natasha Romanoff'];
-        const randomProducts = products.filter(p => p.availability);
-        if (randomProducts.length === 0 || outlets.length === 0) return;
-
-        const selectProd = randomProducts[Math.floor(Math.random() * randomProducts.length)];
-        const customerName = randomNames[Math.floor(Math.random() * randomNames.length)];
-        const randomOutlet = outlets[Math.floor(Math.random() * outlets.length)];
-        const randomCustId = `cust-${Math.floor(Math.random() * 5) + 1}`;
+    const fetchDashboardData = async () => {
+      setLoading(true);
+      try {
+        const [cardsData, chartsData, ordersData, statusData, notifData] = await Promise.all([
+          dashboardService.getCards(),
+          dashboardService.getCharts(salesTab),
+          dashboardService.getRecentOrders(),
+          dashboardService.getSystemStatus(),
+          dashboardService.getNotifications()
+        ]);
         
-        const subtotal = selectProd.price;
-        const tax = parseFloat((subtotal * (selectProd.gstRate / 100)).toFixed(2));
-        const deliveryCharge = 2.99;
-        const packagingCharge = 1.50;
-        const total = parseFloat((subtotal + tax + deliveryCharge + packagingCharge).toFixed(2));
-        
-        const orderId = `order-${Date.now().toString().slice(-3)}`;
-        
-        const newOrder = {
-          id: orderId,
-          customerId: randomCustId,
-          customerName: customerName,
-          customerPhone: `+1 555-${Math.floor(1000 + Math.random() * 9000)}`,
-          outletId: randomOutlet.id,
-          outletName: randomOutlet.name,
-          items: [{ productId: selectProd.id, name: selectProd.name, quantity: 1, price: selectProd.price, isVeg: selectProd.isVeg }],
-          subtotal,
-          tax,
-          deliveryCharge,
-          packagingCharge,
-          discount: 0,
-          total,
-          status: 'Pending' as const,
-          paymentStatus: 'Paid' as const,
-          paymentMethod: 'UPI' as const,
-          createdAt: new Date().toISOString(),
-          address: '124 Simulated Lane, New York, NY',
-          timeline: [{ status: 'Pending', timestamp: new Date().toISOString(), title: 'Order Placed', description: 'Order placed via simulated active live stream.' }],
-          orderType: 'Delivery' as const
-        };
-
-        dispatch(addSimulatedOrder(newOrder));
-        axios.post('/api/orders', newOrder).catch(err => console.warn('Failed to sync simulated order:', err));
-        
-        dispatch(addNotification({
-          title: 'New Delivery Order',
-          description: `${customerName} ordered ${selectProd.name} ($${selectProd.price.toFixed(2)})`,
-          type: 'order',
-          linkId: newOrder.id
-        }));
+        setCards(cardsData || []);
+        setChartData(chartsData || null);
+        setRecentOrders(ordersData || []);
+        setSystemStatus(statusData || null);
+        setNotifications(notifData || []);
+      } catch (error) {
+        console.error("Failed to fetch dashboard data:", error);
+      } finally {
+        setLoading(false);
       }
-    }, 8000);
-    
-    return () => clearInterval(orderTimer);
-  }, [dispatch, products, outlets, isStreamActive]);
+    };
 
-  // Filters based on chosen outlet in the global switcher
-  const filteredOrders = orders.filter(o => activeOutletId === 'all' || o.outletId === activeOutletId);
-  const filteredMaterials = rawMaterials; // stock is global inventory
-  const filteredOutlets = outlets.filter(o => activeOutletId === 'all' || o.id === activeOutletId);
-
-  // Math totals
-  const totalRevenue = filteredOrders
-    .filter(o => o.status !== 'Cancelled')
-    .reduce((sum, o) => sum + o.total, 0);
-
-  const activeOrdersCount = filteredOrders.filter(o => 
-    ['Pending', 'Preparing', 'Ready', 'Out for Delivery'].includes(o.status)
-  ).length;
-
-  const lowStockCount = filteredMaterials.filter(m => m.stock < m.minStockAlert).length;
-  const activeTicketsCount = tickets.filter(t => t.status === 'Open').length;
-
-  // Chart datasets
-  const weeklySalesData = [
-    { day: 'Mon', sales: 4000, orders: 120 },
-    { day: 'Tue', sales: 4500, orders: 140 },
-    { day: 'Wed', sales: 5100, orders: 165 },
-    { day: 'Thu', sales: 4800, orders: 150 },
-    { day: 'Fri', sales: 7200, orders: 230 },
-    { day: 'Sat', sales: 9400, orders: 310 },
-    { day: 'Sun', sales: 8800, orders: 290 },
-  ];
-
-  const dailySalesData = [
-    { hour: '08 AM', sales: 600 },
-    { hour: '10 AM', sales: 1200 },
-    { hour: '12 PM', sales: 2400 },
-    { hour: '02 PM', sales: 1800 },
-    { hour: '04 PM', sales: 1100 },
-    { hour: '06 PM', sales: 2900 },
-    { hour: '08 PM', sales: 3800 },
-    { hour: '10 PM', sales: 2100 },
-  ];
-
-  const monthlySalesData = [
-    { month: 'Jan', sales: 68000 },
-    { month: 'Feb', sales: 74000 },
-    { month: 'Mar', sales: 91000 },
-    { month: 'Apr', sales: 85000 },
-    { month: 'May', sales: 98000 },
-    { month: 'Jun', sales: 112000 },
-  ];
-
-  const topProductsData = [
-    { name: 'Matcha Latte', value: 45 },
-    { name: 'Truffle Burger', value: 30 },
-    { name: 'Pepperoni Pizza', value: 15 },
-    { name: 'Avocado Toast', value: 10 },
-  ];
+    fetchDashboardData();
+  }, [salesTab]);
 
   const COLORS = ['#1B4332', '#8B5E3C', '#2C7A7B', '#C77B30'];
 
-  const outletPerformanceData = outlets.map(o => ({
-    name: o.name.replace(' Outlet', '').replace(' Cafe', '').replace(' Kitchen', ''),
-    revenue: o.revenue,
-    orders: o.ordersCount
-  }));
-
-  const getSalesChartData = () => {
-    if (salesTab === 'daily') return dailySalesData;
-    if (salesTab === 'monthly') return monthlySalesData;
-    return weeklySalesData;
-  };
-
-  const getSalesChartKey = () => {
-    if (salesTab === 'daily') return 'hour';
-    if (salesTab === 'monthly') return 'month';
-    return 'day';
-  };
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '70vh' }}>
+        <CircularProgress size={60} thickness={4} />
+      </Box>
+    );
+  }
 
   return (
     <Box>
@@ -196,108 +80,41 @@ const Dashboard: React.FC = () => {
             Live performance indicators and kitchen delivery trackers for your outlets.
           </Typography>
         </Box>
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          <MuiTooltip title={isStreamActive ? "Click to Pause live order stream simulation" : "Click to Resume live order stream simulation"}>
-            <Chip 
-              icon={
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, pl: 0.5 }}>
-                  <Flame 
-                    size={14} 
-                    style={{ 
-                      transition: 'all 0.3s ease',
-                      transform: isStreamActive ? 'scale(1.15)' : 'scale(1.0)',
-                      opacity: isStreamActive ? 1 : 0.5,
-                      color: isStreamActive ? '#E65C00' : 'inherit'
-                    }} 
-                  />
-                  {isStreamActive && (
-                    <Box sx={{
-                      width: 6,
-                      height: 6,
-                      borderRadius: '50%',
-                      bgcolor: '#4ade80',
-                      animation: 'pulse-dot 1.5s infinite',
-                      '@keyframes pulse-dot': {
-                        '0%': { transform: 'scale(0.8)', opacity: 0.5 },
-                        '50%': { transform: 'scale(1.3)', opacity: 1 },
-                        '100%': { transform: 'scale(0.8)', opacity: 0.5 }
-                      }
-                    }} />
-                  )}
-                </Box>
-              } 
-              label={isStreamActive ? "Live Order Stream Active" : "Live Stream Paused"} 
-              variant={isStreamActive ? "filled" : "outlined"}
-              onClick={handleToggleStream}
-              sx={{ 
-                fontWeight: 700, 
-                cursor: 'pointer',
-                fontFamily: 'Outfit',
-                transition: 'all 0.3s ease',
-                ...(isStreamActive ? {
-                  bgcolor: 'primary.main',
-                  color: 'white',
-                  boxShadow: '0 4px 12px rgba(27, 67, 50, 0.25)',
-                  '&:hover': {
-                    bgcolor: 'primary.dark',
-                  }
-                } : {
-                  bgcolor: 'action.hover',
-                  color: 'text.secondary',
-                  borderColor: 'divider',
-                  '&:hover': {
-                    bgcolor: 'action.selected',
-                  }
-                })
-              }} 
-            />
-          </MuiTooltip>
-        </Box>
       </Box>
 
       {/* Grid summary cards */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12} sm={6} md={3}>
-          <StatCard
-            title="Total Revenue (Gross)"
-            value={`$${totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-            icon={<DollarSign size={22} />}
-            trend="+12.4% from last week"
-            trendType="up"
-            color="#1B4332"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <StatCard
-            title="Active Dispatch Queue"
-            value={activeOrdersCount.toString()}
-            icon={<ShoppingCart size={22} />}
-            trend={`${filteredOrders.filter(o => o.status === 'Pending').length} pending confirmation`}
-            trendType="info"
-            color="#2C7A7B"
-            isPulse={activeOrdersCount > 0}
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <StatCard
-            title="Low Inventory Items"
-            value={lowStockCount.toString()}
-            icon={<AlertTriangle size={22} />}
-            trend={lowStockCount > 0 ? "Reorder purchase orders due" : "Stock healthy"}
-            trendType={lowStockCount > 0 ? "down" : "up"}
-            color={lowStockCount > 0 ? "#9B2C2C" : "#2D6A4F"}
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <StatCard
-            title="Open Tickets"
-            value={activeTicketsCount.toString()}
-            icon={<Users size={22} />}
-            trend={`${tickets.filter(t => t.priority === 'High' && t.status !== 'Resolved').length} high priority`}
-            trendType="neutral"
-            color="#C77B30"
-          />
-        </Grid>
+        {cards.map((card: StatCardData, index: number) => {
+          let icon = <TrendingUp size={22} />;
+          let color = "#1B4332";
+          if (card.title.includes("Revenue")) {
+             icon = <DollarSign size={22} />;
+             color = "#1B4332";
+          } else if (card.title.includes("Dispatch")) {
+             icon = <ShoppingCart size={22} />;
+             color = "#2C7A7B";
+          } else if (card.title.includes("Inventory")) {
+             icon = <AlertTriangle size={22} />;
+             color = card.trendType === 'down' ? "#9B2C2C" : "#2D6A4F";
+          } else if (card.title.includes("Tickets")) {
+             icon = <Users size={22} />;
+             color = "#C77B30";
+          }
+
+          return (
+            <Grid item xs={12} sm={6} md={3} key={card.title}>
+              <StatCard
+                title={card.title}
+                value={card.value}
+                icon={icon}
+                trend={card.trend}
+                trendType={card.trendType}
+                color={color}
+                isPulse={card.isPulse}
+              />
+            </Grid>
+          )
+        })}
       </Grid>
 
       {/* Charts section */}
@@ -321,27 +138,33 @@ const Dashboard: React.FC = () => {
               </Box>
 
               <Box sx={{ width: '100%', height: 300 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={getSalesChartData()} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#1B4332" stopOpacity={0.35}/>
-                        <stop offset="95%" stopColor="#1B4332" stopOpacity={0}/>
-                      </linearGradient>
-                    </defs>
-                    <XAxis dataKey={getSalesChartKey()} stroke={theme.palette.text.secondary} fontSize={11} tickLine={false} />
-                    <YAxis stroke={theme.palette.text.secondary} fontSize={11} tickLine={false} />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: theme.palette.background.paper, 
-                        borderColor: theme.palette.divider,
-                        borderRadius: 8,
-                        color: theme.palette.text.primary
-                      }} 
-                    />
-                    <Area type="monotone" dataKey="sales" name="Revenue ($)" stroke="#1B4332" strokeWidth={3} fillOpacity={1} fill="url(#colorSales)" />
-                  </AreaChart>
-                </ResponsiveContainer>
+                {chartData.revenue_chart.length === 0 ? (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: 'text.secondary' }}>
+                    No sales data available. Awaiting modules.
+                  </Box>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={chartData.revenue_chart} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#1B4332" stopOpacity={0.35}/>
+                          <stop offset="95%" stopColor="#1B4332" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <XAxis dataKey="label" stroke={theme.palette.text.secondary} fontSize={11} tickLine={false} />
+                      <YAxis stroke={theme.palette.text.secondary} fontSize={11} tickLine={false} />
+                      <Tooltip 
+                        contentStyle={{ 
+                          backgroundColor: theme.palette.background.paper, 
+                          borderColor: theme.palette.divider,
+                          borderRadius: 8,
+                          color: theme.palette.text.primary
+                        }} 
+                      />
+                      <Area type="monotone" dataKey="sales" name="Revenue ($)" stroke="#1B4332" strokeWidth={3} fillOpacity={1} fill="url(#colorSales)" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                )}
               </Box>
             </CardContent>
           </Card>
@@ -354,47 +177,55 @@ const Dashboard: React.FC = () => {
               <Typography variant="h6" sx={{ fontFamily: 'Outfit', fontWeight: 700, mb: 3 }}>
                 Top Selling Products
               </Typography>
-              <Box sx={{ width: '100%', height: 200, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={topProductsData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={80}
-                      paddingAngle={5}
-                      dataKey="value"
-                    >
-                      {topProductsData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: theme.palette.background.paper, 
-                        borderColor: theme.palette.divider,
-                        borderRadius: 8
-                      }} 
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              </Box>
-
-              {/* Legends list */}
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mt: 2 }}>
-                {topProductsData.map((item, index) => (
-                  <Box key={item.name} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Box sx={{ width: 12, height: 12, borderRadius: 0.5, bgcolor: COLORS[index] }} />
-                      <Typography variant="body2" sx={{ fontWeight: 500 }}>{item.name}</Typography>
-                    </Box>
-                    <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 700 }}>
-                      {item.value}% shares
-                    </Typography>
+              
+              {chartData.top_products.length === 0 ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 200, color: 'text.secondary' }}>
+                  No product data.
+                </Box>
+              ) : (
+                <>
+                  <Box sx={{ width: '100%', height: 200, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={chartData.top_products}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={60}
+                          outerRadius={80}
+                          paddingAngle={5}
+                          dataKey="value"
+                        >
+                          {chartData.top_products.map((entry: any, index: number) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip 
+                          contentStyle={{ 
+                            backgroundColor: theme.palette.background.paper, 
+                            borderColor: theme.palette.divider,
+                            borderRadius: 8
+                          }} 
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
                   </Box>
-                ))}
-              </Box>
+
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mt: 2 }}>
+                    {chartData.top_products.map((item: any, index: number) => (
+                      <Box key={item.name} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Box sx={{ width: 12, height: 12, borderRadius: 0.5, bgcolor: COLORS[index] }} />
+                          <Typography variant="body2" sx={{ fontWeight: 500 }}>{item.name}</Typography>
+                        </Box>
+                        <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 700 }}>
+                          {item.value}% shares
+                        </Typography>
+                      </Box>
+                    ))}
+                  </Box>
+                </>
+              )}
             </CardContent>
           </Card>
         </Grid>
@@ -409,20 +240,26 @@ const Dashboard: React.FC = () => {
                 Outlet Gross Comparison
               </Typography>
               <Box sx={{ width: '100%', height: 260 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={outletPerformanceData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                    <XAxis dataKey="name" stroke={theme.palette.text.secondary} fontSize={11} tickLine={false} />
-                    <YAxis stroke={theme.palette.text.secondary} fontSize={11} tickLine={false} />
-                    <Tooltip
-                      contentStyle={{ 
-                        backgroundColor: theme.palette.background.paper, 
-                        borderColor: theme.palette.divider,
-                        borderRadius: 8
-                      }}
-                    />
-                    <Bar dataKey="revenue" name="Sales ($)" fill="#2C7A7B" radius={[6, 6, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
+                {chartData.outlet_performance.length === 0 ? (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: 'text.secondary' }}>
+                    No outlet data.
+                  </Box>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData.outlet_performance} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                      <XAxis dataKey="name" stroke={theme.palette.text.secondary} fontSize={11} tickLine={false} />
+                      <YAxis stroke={theme.palette.text.secondary} fontSize={11} tickLine={false} />
+                      <Tooltip
+                        contentStyle={{ 
+                          backgroundColor: theme.palette.background.paper, 
+                          borderColor: theme.palette.divider,
+                          borderRadius: 8
+                        }}
+                      />
+                      <Bar dataKey="revenue" name="Sales ($)" fill="#2C7A7B" radius={[6, 6, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
               </Box>
             </CardContent>
           </Card>
@@ -452,22 +289,22 @@ const Dashboard: React.FC = () => {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {filteredOrders.length === 0 ? (
+                    {recentOrders.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={4} align="center" sx={{ py: 3, color: 'text.secondary' }}>
                           No active kitchen orders
                         </TableCell>
                       </TableRow>
                     ) : (
-                      filteredOrders.map((o) => (
+                      recentOrders.map((o: RecentOrderData) => (
                         <TableRow key={o.id} hover>
-                          <TableCell sx={{ fontWeight: 700, color: 'primary.main' }}>#{o.id.split('-')[1]}</TableCell>
+                          <TableCell sx={{ fontWeight: 700, color: 'primary.main' }}>#{o.id.split('-')[1] || o.id}</TableCell>
                           <TableCell>
-                            <Typography variant="body2" sx={{ fontWeight: 600 }}>{o.customerName}</Typography>
-                            <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>{o.outletName.replace(' Outlet', '').replace(' Cafe', '')}</Typography>
+                            <Typography variant="body2" sx={{ fontWeight: 600 }}>{o.customer_name}</Typography>
+                            <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>{o.outlet_name.replace(' Outlet', '').replace(' Cafe', '')}</Typography>
                           </TableCell>
                           <TableCell>
-                            {o.items.map(it => `${it.quantity}x ${it.name}`).join(', ')}
+                            {o.items_summary}
                           </TableCell>
                           <TableCell>
                             <Chip 

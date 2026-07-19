@@ -1,27 +1,32 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { 
-  Box, Typography, Card, CardContent, Grid, Button, Table, 
-  TableBody, TableCell, TableContainer, TableHead, TableRow, 
+  Box, Typography, Card, CardContent, Grid, Button, 
   Chip, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, 
   TextField, FormControl, InputLabel, Select, MenuItem, 
-  Accordion, AccordionSummary, AccordionDetails, useTheme, Divider
+  Accordion, AccordionSummary, AccordionDetails, useTheme, Divider,
+  CircularProgress
 } from '@mui/material';
 import { 
-  Image, Plus, Trash2, Edit, FileSignature, 
+  Plus, Trash2, FileSignature, 
   ChevronDown, HelpCircle, Save, Check 
 } from 'lucide-react';
-import { RootState, addEditBanner, deleteBanner, toggleBannerStatus, addAuditLog, addNotification } from '../store';
+import { RootState, addAuditLog, addNotification } from '../store';
+import { cmsService, BannerResponse, BannerCreateRequest } from '../services/cmsService';
 
 const BannerCMS: React.FC = () => {
   const theme = useTheme();
   const dispatch = useDispatch();
 
   const currentUser = useSelector((state: RootState) => state.auth.user);
-  const banners = useSelector((state: RootState) => state.db.banners);
 
   const [activeSubTab, setActiveSubTab] = useState<'banners' | 'cms'>('banners');
   const [bannerOpen, setBannerOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  // Data states
+  const [banners, setBanners] = useState<BannerResponse[]>([]);
+  const [faqs, setFaqs] = useState<{q: string, a: string}[]>([]);
 
   // Form states
   const [bTitle, setBTitle] = useState('');
@@ -30,103 +35,148 @@ const BannerCMS: React.FC = () => {
   const [bSchedule, setBSchedule] = useState('');
 
   // CMS texts states
-  const [cmsAbout, setCmsAbout] = useState('Delivo is a premium, multi-outlet food and beverage delivery logistics network delivering freshness within minutes.');
-  const [cmsPrivacy, setCmsPrivacy] = useState('Your data security is critical to us. We store credit information using PCI-compliant tokens and verify rider compliance.');
+  const [cmsAbout, setCmsAbout] = useState('');
+  const [cmsPrivacy, setCmsPrivacy] = useState('');
   const [saveAlert, setSaveAlert] = useState(false);
 
-  const handleBannerSubmit = (e: React.FormEvent) => {
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const [banRes, pagesRes] = await Promise.all([
+        cmsService.getBanners(),
+        cmsService.getPages()
+      ]);
+      setBanners(banRes);
+      setCmsAbout(pagesRes.aboutUs);
+      setCmsPrivacy(pagesRes.privacyPolicy);
+      setFaqs(pagesRes.faqs);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  const handleBannerSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!bTitle || !bImage) return;
 
-    dispatch(addEditBanner({
-      id: `ban-${Date.now().toString().slice(-3)}`,
-      title: bTitle,
-      image: bImage,
-      status: 'Active',
-      type: bType,
-      schedule: bSchedule || 'Always active'
-    }));
+    try {
+      const payload: BannerCreateRequest = {
+        title: bTitle,
+        image: bImage,
+        status: 'Active',
+        type: bType,
+        schedule: bSchedule || 'Always active'
+      };
 
-    dispatch(addNotification({
-      title: 'Marketing Banner Uploaded',
-      description: `Banner "${bTitle}" added to slider registry.`,
-      type: 'system'
-    }));
-
-    dispatch(addAuditLog({
-      username: currentUser?.email || 'Simulator Client',
-      role: currentUser?.role || 'Guest',
-      action: `Created new banner: ${bTitle}`,
-      module: 'Banner Management',
-      ipAddress: '127.0.0.1',
-      browser: 'Admin Console'
-    }));
-
-    setBannerOpen(false);
-    setBTitle('');
-    setBImage('');
-    setBSchedule('');
-  };
-
-  const handleDeleteBanner = (id: string, title: string) => {
-    if (confirm(`Delete banner "${title}" from sliders?`)) {
-      dispatch(deleteBanner(id));
+      await cmsService.createBanner(payload);
 
       dispatch(addNotification({
-        title: 'Banner Removed',
-        description: `Successfully deleted "${title}" from registry.`,
+        title: 'Marketing Banner Uploaded',
+        description: `Banner "${bTitle}" added to slider registry.`,
         type: 'system'
       }));
 
       dispatch(addAuditLog({
         username: currentUser?.email || 'Simulator Client',
         role: currentUser?.role || 'Guest',
-        action: `Deleted marketing banner ${title}`,
+        action: `Created new banner: ${bTitle}`,
         module: 'Banner Management',
         ipAddress: '127.0.0.1',
         browser: 'Admin Console'
       }));
+
+      setBannerOpen(false);
+      setBTitle('');
+      setBImage('');
+      setBSchedule('');
+      fetchData();
+    } catch (err) {
+      console.error(err);
     }
   };
 
-  const handleToggleBannerStatus = (id: string, title: string, currentStatus: string) => {
-    dispatch(toggleBannerStatus(id));
-    const nextStatus = currentStatus === 'Active' ? 'Paused' : 'Active';
+  const handleDeleteBanner = async (id: string, title: string) => {
+    if (confirm(`Delete banner "${title}" from sliders?`)) {
+      try {
+        await cmsService.deleteBanner(id);
 
-    dispatch(addNotification({
-      title: 'Banner Status Updated',
-      description: `Banner "${title}" set to ${nextStatus}.`,
-      type: 'system'
-    }));
+        dispatch(addNotification({
+          title: 'Banner Removed',
+          description: `Successfully deleted "${title}" from registry.`,
+          type: 'system'
+        }));
 
-    dispatch(addAuditLog({
-      username: currentUser?.email || 'Simulator Client',
-      role: currentUser?.role || 'Guest',
-      action: `Toggled banner "${title}" status to ${nextStatus}`,
-      module: 'Banner Management',
-      ipAddress: '127.0.0.1',
-      browser: 'Admin Console'
-    }));
+        dispatch(addAuditLog({
+          username: currentUser?.email || 'Simulator Client',
+          role: currentUser?.role || 'Guest',
+          action: `Deleted marketing banner ${title}`,
+          module: 'Banner Management',
+          ipAddress: '127.0.0.1',
+          browser: 'Admin Console'
+        }));
+        
+        fetchData();
+      } catch (err) {
+        console.error(err);
+      }
+    }
   };
 
-  const handleCmsSave = () => {
-    setSaveAlert(true);
-    setTimeout(() => setSaveAlert(false), 3000);
-    
-    dispatch(addNotification({
-      title: 'CMS Guidelines Saved',
-      description: 'Terms and Privacy policies successfully saved.',
-      type: 'system'
-    }));
+  const handleToggleBannerStatus = async (id: string, title: string, currentStatus: string) => {
+    try {
+      await cmsService.toggleBannerStatus(id);
+      const nextStatus = currentStatus === 'Active' ? 'Paused' : 'Active';
 
-    dispatch(addAuditLog({
-      username: currentUser?.email || 'Simulator Client',
-      role: currentUser?.role || 'Guest',
-      action: 'Saved CMS Policy settings',
-      module: 'CMS',
-      ipAddress: '127.0.0.1',
-      browser: 'Admin Console'
-    }));
+      dispatch(addNotification({
+        title: 'Banner Status Updated',
+        description: `Banner "${title}" set to ${nextStatus}.`,
+        type: 'system'
+      }));
+
+      dispatch(addAuditLog({
+        username: currentUser?.email || 'Simulator Client',
+        role: currentUser?.role || 'Guest',
+        action: `Toggled banner "${title}" status to ${nextStatus}`,
+        module: 'Banner Management',
+        ipAddress: '127.0.0.1',
+        browser: 'Admin Console'
+      }));
+      
+      fetchData();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleCmsSave = async () => {
+    try {
+      await cmsService.updatePages({ aboutUs: cmsAbout, privacyPolicy: cmsPrivacy });
+      setSaveAlert(true);
+      setTimeout(() => setSaveAlert(false), 3000);
+      
+      dispatch(addNotification({
+        title: 'CMS Guidelines Saved',
+        description: 'Terms and Privacy policies successfully saved.',
+        type: 'system'
+      }));
+
+      dispatch(addAuditLog({
+        username: currentUser?.email || 'Simulator Client',
+        role: currentUser?.role || 'Guest',
+        action: 'Saved CMS Policy settings',
+        module: 'CMS',
+        ipAddress: '127.0.0.1',
+        browser: 'Admin Console'
+      }));
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   return (
@@ -165,7 +215,11 @@ const BannerCMS: React.FC = () => {
         </Box>
       )}
 
-      {activeSubTab === 'banners' ? (
+      {loading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}>
+          <CircularProgress />
+        </Box>
+      ) : activeSubTab === 'banners' ? (
         // Banners layout list
         <Box>
           <Box sx={{ mb: 3, display: 'flex', justifyContent: 'flex-end' }}>
@@ -216,6 +270,9 @@ const BannerCMS: React.FC = () => {
                 </Card>
               </Grid>
             ))}
+            {banners.length === 0 && (
+               <Typography variant="body2" sx={{ width: '100%', textAlign: 'center', py: 4, color: 'text.secondary' }}>No banners found.</Typography>
+            )}
           </Grid>
         </Box>
       ) : (
@@ -274,11 +331,7 @@ const BannerCMS: React.FC = () => {
                 </Box>
 
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                  {[
-                    { q: 'How do I request a cancellation refund?', a: 'Clients request refund forms from the portal. The Finance Manager reviews and issues wallet payouts instantly.' },
-                    { q: 'What is the base delivery rate charge policy?', a: 'Based on distance: $2.00 base charge for first 3 miles, plus $0.80 per mile beyond, configured in local settings.' },
-                    { q: 'How can Outlet Managers adjust tax details?', a: 'Outlet managers have read/edit parameters for their specific outlets in Outlet settings.' }
-                  ].map((faq, idx) => (
+                  {faqs.map((faq, idx) => (
                     <Accordion key={idx} sx={{ border: `1px solid ${theme.palette.divider}`, boxShadow: 'none', '&:before': { display: 'none' } }}>
                       <AccordionSummary expandIcon={<ChevronDown size={16} />}>
                         <Typography variant="body2" sx={{ fontWeight: 700 }}>{faq.q}</Typography>
@@ -288,6 +341,9 @@ const BannerCMS: React.FC = () => {
                       </AccordionDetails>
                     </Accordion>
                   ))}
+                  {faqs.length === 0 && (
+                     <Typography variant="body2" sx={{ color: 'text.secondary' }}>No FAQs configured yet.</Typography>
+                  )}
                 </Box>
               </CardContent>
             </Card>

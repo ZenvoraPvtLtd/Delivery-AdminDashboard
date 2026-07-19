@@ -1,5 +1,7 @@
 import { configureStore, createSlice, PayloadAction, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
+import { authService, LoginRequest } from '../services/authService';
+import { setAuthToken, setRefreshToken } from '../services/api';
 import { 
   Product, 
   Outlet, 
@@ -215,6 +217,33 @@ const uiSlice = createSlice({
   }
 });
 
+// Async Thunks for Backend Integration
+export const loginThunk = createAsyncThunk('auth/login', async (payload: LoginRequest, { rejectWithValue }) => {
+  try {
+    const response = await authService.login(payload);
+    if (response.success && response.data) {
+      setAuthToken(response.data.access_token);
+      setRefreshToken(response.data.refresh_token);
+      return response.data;
+    }
+    return rejectWithValue(response.message);
+  } catch (error: any) {
+    return rejectWithValue(error.response?.data?.detail || 'Login failed');
+  }
+});
+
+export const fetchCurrentUserThunk = createAsyncThunk('auth/fetchCurrentUser', async (_, { rejectWithValue }) => {
+  try {
+    const response = await authService.getCurrentUser();
+    if (response.success && response.data) {
+      return response.data;
+    }
+    return rejectWithValue('Failed to load user');
+  } catch (error: any) {
+    return rejectWithValue(error.response?.data?.detail || 'Session expired');
+  }
+});
+
 // Auth Slice
 interface AuthState {
   isAuthenticated: boolean;
@@ -225,9 +254,12 @@ interface AuthState {
     name: string;
     role: UserRole;
     outletId?: string; // assigned outlet if Outlet Manager
+    permissions?: string[];
   } | null;
   sessionTimeout: number; // in seconds
   rememberMe: boolean;
+  isLoading: boolean;
+  error: string | null;
 }
 
 const initialAuthState: AuthState = {
@@ -236,41 +268,25 @@ const initialAuthState: AuthState = {
   is2FAVerified: false,
   user: null,
   sessionTimeout: 1800, // 30 minutes
-  rememberMe: false
+  rememberMe: false,
+  isLoading: false,
+  error: null
 };
 
 const authSlice = createSlice({
   name: 'auth',
   initialState: initialAuthState,
   reducers: {
-    loginRequest(state, action: PayloadAction<{ email: string; name: string; role: UserRole; rememberMe: boolean }>) {
-      state.user = {
-        email: action.payload.email,
-        name: action.payload.name,
-        role: action.payload.role,
-        outletId: action.payload.role === 'Outlet Manager' ? 'out-1' : undefined
-      };
-      state.rememberMe = action.payload.rememberMe;
-      // Force 2FA for Super Admin, Admin, and Finance Manager roles as a showcase
-      if (['Super Admin', 'Admin', 'Finance Manager'].includes(action.payload.role)) {
-        state.is2FARequired = true;
-        state.is2FAVerified = false;
-        state.isAuthenticated = false;
-      } else {
-        state.is2FARequired = false;
-        state.is2FAVerified = true;
-        state.isAuthenticated = true;
-      }
-    },
     verify2FA(state, action: PayloadAction<string>) {
-      // Mock code verification (accepts '123456' or any 6-digit code)
-      if (action.payload.length === 6) {
-        state.is2FAVerified = true;
-        state.isAuthenticated = true;
-        state.is2FARequired = false;
-      }
+      // Future integration
+      state.is2FAVerified = true;
+      state.isAuthenticated = true;
+      state.is2FARequired = false;
     },
     logout(state) {
+      setAuthToken(null);
+      setRefreshToken(null);
+      authService.logout().catch(() => {});
       state.isAuthenticated = false;
       state.is2FAVerified = false;
       state.is2FARequired = false;
@@ -293,6 +309,39 @@ const authSlice = createSlice({
         state.user.email = action.payload.email;
       }
     }
+  },
+  extraReducers: (builder) => {
+    // Login
+    builder.addCase(loginThunk.pending, (state) => {
+      state.isLoading = true;
+      state.error = null;
+    });
+    builder.addCase(loginThunk.fulfilled, (state) => {
+      state.isLoading = false;
+      state.isAuthenticated = true;
+      state.is2FAVerified = true; // Auto verify for now
+      state.is2FARequired = false;
+    });
+    builder.addCase(loginThunk.rejected, (state, action) => {
+      state.isLoading = false;
+      state.error = action.payload as string;
+    });
+    
+    // Fetch Current User
+    builder.addCase(fetchCurrentUserThunk.fulfilled, (state, action) => {
+      state.user = {
+        email: action.payload.email,
+        name: action.payload.full_name,
+        role: action.payload.role as UserRole,
+        permissions: action.payload.permissions,
+        outletId: action.payload.role === 'Outlet Manager' ? 'out-1' : undefined
+      };
+      state.isAuthenticated = true;
+    });
+    builder.addCase(fetchCurrentUserThunk.rejected, (state) => {
+      state.isAuthenticated = false;
+      state.user = null;
+    });
   }
 });
 
@@ -690,7 +739,6 @@ export const {
 } = uiSlice.actions;
 
 export const { 
-  loginRequest, 
   verify2FA, 
   logout, 
   extendSession, 

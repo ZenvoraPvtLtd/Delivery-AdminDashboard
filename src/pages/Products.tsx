@@ -1,32 +1,36 @@
-import React, { useState } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useDispatch } from 'react-redux';
 import { 
   Box, Typography, Card, CardContent, Grid, Button, Table, 
   TableBody, TableCell, TableContainer, TableHead, TableRow, 
   Chip, Switch, IconButton, Dialog, DialogTitle, DialogContent, 
   DialogActions, TextField, FormControl, InputLabel, Select, 
   MenuItem, FormControlLabel, Checkbox, Tabs, Tab, Alert, useTheme, 
-  ListItemText, Divider, LinearProgress
+  ListItemText, Divider, LinearProgress, CircularProgress, Pagination
 } from '@mui/material';
 import { 
   Plus, Edit2, Trash2, Download, Upload, UtensilsCrossed, 
   Check, AlertTriangle, FileSpreadsheet, Hourglass
 } from 'lucide-react';
-import { RootState, addEditProduct, deleteProduct, toggleProductAvailability, addAuditLog, addNotification } from '../store';
-import { Product } from '../store';
+import { addNotification } from '../store';
+import { productService, PaginatedProducts } from '../services/productService';
+import { Product } from '../store'; // Adjust import if needed
 
 const Products: React.FC = () => {
   const theme = useTheme();
   const dispatch = useDispatch();
 
-  const currentUser = useSelector((state: RootState) => state.auth.user);
-  const products = useSelector((state: RootState) => state.db.products);
-  const outlets = useSelector((state: RootState) => state.db.outlets);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const size = 10;
 
   const [activeTab, setActiveTab] = useState(0); // 0: Products List, 1: Shift-Based Menu Mappings
   const [menuSchedule, setMenuSchedule] = useState<'All' | 'Breakfast' | 'Lunch' | 'Dinner' | 'Late Night'>('All');
   
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [vegFilter, setVegFilter] = useState('All');
 
@@ -51,58 +55,57 @@ const Products: React.FC = () => {
   const [bulkProgress, setBulkProgress] = useState(0);
   const [bulkStatus, setBulkStatus] = useState<'idle' | 'importing' | 'completed'>('idle');
 
-  const categories = ['All', ...Array.from(new Set(products.map(p => p.category)))];
+  // We hardcode categories for now, but ideally fetch from DB.
+  const categories = ['All', 'Fast Food', 'Italian', 'Salads', 'Beverages', 'Breakfast', 'Snacks'];
 
-  const filteredProducts = products.filter(p => {
-    const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase()) || p.description.toLowerCase().includes(search.toLowerCase());
-    const matchesCat = categoryFilter === 'All' || p.category === categoryFilter;
-    const matchesVeg = vegFilter === 'All' || 
-                       (vegFilter === 'Veg' && p.isVeg) || 
-                       (vegFilter === 'Non-Veg' && !p.isVeg);
-    
-    // Shift menu mapping filters
-    const matchesSchedule = menuSchedule === 'All' ||
-      (menuSchedule === 'Breakfast' && ['Breakfast', 'Beverages'].includes(p.category)) ||
-      (menuSchedule === 'Lunch' && ['Fast Food', 'Italian', 'Salads', 'Beverages'].includes(p.category)) ||
-      (menuSchedule === 'Dinner' && ['Fast Food', 'Italian', 'Salads', 'Snacks', 'Beverages'].includes(p.category)) ||
-      (menuSchedule === 'Late Night' && ['Fast Food', 'Snacks', 'Beverages'].includes(p.category));
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 500);
+    return () => clearTimeout(timer);
+  }, [search]);
 
-    return matchesSearch && matchesCat && matchesVeg && matchesSchedule;
-  });
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await productService.getProducts(page, size, debouncedSearch, categoryFilter, vegFilter, menuSchedule);
+      setProducts(res.data);
+      setTotal(res.total);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  }, [page, size, debouncedSearch, categoryFilter, vegFilter, menuSchedule]);
 
-  const handleToggleAvailability = (id: string) => {
-    dispatch(toggleProductAvailability(id));
-    const prod = products.find(p => p.id === id);
-    if (!prod) return;
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
-    dispatch(addNotification({
-      title: 'Menu Availability Shifted',
-      description: `${prod.name} set to ${!prod.availability ? 'Available' : 'Sold Out'}`,
-      type: 'stock'
-    }));
-
-    dispatch(addAuditLog({
-      username: currentUser?.email || 'Simulator Client',
-      role: currentUser?.role || 'Guest',
-      action: `Toggled availability for product ${prod.name} to ${!prod.availability}`,
-      module: 'Products',
-      ipAddress: '127.0.0.1',
-      browser: 'Admin Console'
-    }));
+  const handleToggleAvailability = async (id: string, current: boolean, name: string) => {
+    try {
+      await productService.toggleAvailability(id, !current);
+      dispatch(addNotification({
+        title: 'Menu Availability Shifted',
+        description: `${name} set to ${!current ? 'Available' : 'Sold Out'}`,
+        type: 'stock'
+      }));
+      fetchData();
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const handleEditClick = (prod: Product) => {
     setEditProduct(prod);
     setProdName(prod.name);
     setProdCategory(prod.category);
-    setProdSubcategory(prod.subcategory);
+    setProdSubcategory(prod.subcategory || '');
     setProdPrice(prod.price.toString());
     setProdDiscount(prod.discount.toString());
     setProdPrepTime(prod.preparationTime.toString());
     setProdGst(prod.gstRate.toString());
     setProdIsVeg(prod.isVeg);
     setProdBestSeller(prod.isBestSeller);
-    setProdDesc(prod.description);
+    setProdDesc(prod.description || '');
     setProdOutlets(prod.outletIds);
     setProductModalOpen(true);
   };
@@ -123,66 +126,60 @@ const Products: React.FC = () => {
     setProductModalOpen(true);
   };
 
-  const handleProductSubmit = (e: React.FormEvent) => {
+  const handleProductSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!prodName || !prodPrice) return;
 
-    const formattedProduct: Product = {
-      id: editProduct ? editProduct.id : `prod-${Date.now().toString().slice(-3)}`,
+    const formattedProduct = {
       name: prodName,
       category: prodCategory,
       subcategory: prodSubcategory || prodCategory,
-      price: parseFloat(prodPrice),
+      selling_price: parseFloat(prodPrice),
       discount: parseFloat(prodDiscount) || 0,
       availability: editProduct ? editProduct.availability : true,
-      preparationTime: parseInt(prodPrepTime) || 10,
-      isVeg: prodIsVeg,
-      isBestSeller: prodBestSeller,
+      preparation_time: parseInt(prodPrepTime) || 10,
+      is_veg: prodIsVeg,
+      is_best_seller: prodBestSeller,
       image: editProduct ? editProduct.image : 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400',
-      outletIds: prodOutlets,
-      gstRate: parseInt(prodGst) || 5,
+      outlet_ids: prodOutlets,
+      gst: parseInt(prodGst) || 5,
       description: prodDesc
     };
 
-    dispatch(addEditProduct(formattedProduct));
-
-    dispatch(addNotification({
-      title: editProduct ? 'Product Settings Saved' : 'New Product Registered',
-      description: `${prodName} successfully updated in main catalog.`,
-      type: 'system'
-    }));
-
-    dispatch(addAuditLog({
-      username: currentUser?.email || 'Simulator Client',
-      role: currentUser?.role || 'Guest',
-      action: `${editProduct ? 'Updated' : 'Created'} product ${prodName}`,
-      module: 'Products',
-      ipAddress: '127.0.0.1',
-      browser: 'Admin Console'
-    }));
-
-    setProductModalOpen(false);
-    setEditProduct(null);
-  };
-
-  const handleDeleteProduct = (id: string, name: string) => {
-    if (confirm(`Are you sure you want to delete ${name} from the central inventory?`)) {
-      dispatch(deleteProduct(id));
+    try {
+      if (editProduct) {
+        await productService.updateProduct(editProduct.id, formattedProduct);
+      } else {
+        await productService.createProduct(formattedProduct);
+      }
 
       dispatch(addNotification({
-        title: 'Product Removed',
-        description: `${name} deleted from food menu registry.`,
+        title: editProduct ? 'Product Settings Saved' : 'New Product Registered',
+        description: `${prodName} successfully updated in main catalog.`,
         type: 'system'
       }));
 
-      dispatch(addAuditLog({
-        username: currentUser?.email || 'Simulator Client',
-        role: currentUser?.role || 'Guest',
-        action: `Deleted product ${name} (ID: ${id})`,
-        module: 'Products',
-        ipAddress: '127.0.0.1',
-        browser: 'Admin Console'
-      }));
+      setProductModalOpen(false);
+      setEditProduct(null);
+      fetchData();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleDeleteProduct = async (id: string, name: string) => {
+    if (confirm(`Are you sure you want to delete ${name} from the central inventory?`)) {
+      try {
+        await productService.deleteProduct(id);
+        dispatch(addNotification({
+          title: 'Product Removed',
+          description: `${name} deleted from food menu registry.`,
+          type: 'system'
+        }));
+        fetchData();
+      } catch (err) {
+        console.error(err);
+      }
     }
   };
 
@@ -198,18 +195,14 @@ const Products: React.FC = () => {
           
           dispatch(addNotification({
             title: 'Bulk Import Completed',
-            description: 'Successfully cataloged 18 items from bulk template spreadsheet.',
+            description: 'Successfully cataloged items from bulk template spreadsheet.',
             type: 'system'
           }));
-
-          dispatch(addAuditLog({
-            username: currentUser?.email || 'Simulator Client',
-            role: currentUser?.role || 'Guest',
-            action: 'Bulk Uploaded Products via CSV',
-            module: 'Products',
-            ipAddress: '127.0.0.1',
-            browser: 'Admin Console'
-          }));
+          
+          setTimeout(() => {
+            setBulkOpen(false);
+            fetchData();
+          }, 1500);
           return 100;
         }
         return prev + 25;
@@ -219,7 +212,6 @@ const Products: React.FC = () => {
 
   return (
     <Box>
-      {/* Title */}
       <Box sx={{ mb: 3.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Box>
           <Typography variant="h4" sx={{ fontFamily: 'Outfit', fontWeight: 800 }}>
@@ -235,16 +227,7 @@ const Products: React.FC = () => {
             color="primary" 
             onClick={() => setBulkOpen(true)}
             startIcon={<Upload size={16} />}
-            sx={{ 
-              borderRadius: 2,
-              fontWeight: 600,
-              fontFamily: 'Outfit',
-              borderWidth: '1.5px',
-              '&:hover': {
-                borderWidth: '1.5px',
-                bgcolor: 'rgba(27, 67, 50, 0.05)'
-              }
-            }}
+            sx={{ borderRadius: 2, fontWeight: 600 }}
           >
             Bulk Actions
           </Button>
@@ -253,441 +236,292 @@ const Products: React.FC = () => {
             color="primary" 
             onClick={handleNewClick}
             startIcon={<Plus size={16} />}
-            sx={{ borderRadius: 2 }}
+            sx={{ borderRadius: 2, fontWeight: 600 }}
           >
-            Register Product
+            Add New Item
           </Button>
         </Box>
       </Box>
 
-      {/* Tabs */}
-      <Tabs 
-        value={activeTab} 
-        onChange={(e, val) => setActiveTab(val)} 
-        sx={{ mb: 3.5, borderBottom: `1px solid ${theme.palette.divider}` }}
-        textColor="primary"
-        indicatorColor="primary"
-      >
-        <Tab label="Food Menu Inventory" sx={{ fontWeight: 700 }} />
-        <Tab label="Shift & Outlet Scheduling" sx={{ fontWeight: 700 }} />
-      </Tabs>
-
-      {activeTab === 0 ? (
-        // TAB 1: Main Product List
-        <Box>
-          {/* Filters card */}
-          <Card sx={{ mb: 3 }}>
-            <CardContent sx={{ p: 2 }}>
-              <Grid container spacing={2} alignItems="center">
-                <Grid item xs={12} md={4}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="Search product, descriptions..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                  />
-                </Grid>
-                <Grid item xs={6} md={3}>
-                  <FormControl fullWidth size="small">
-                    <InputLabel>Category</InputLabel>
-                    <Select
-                      value={categoryFilter}
-                      label="Category"
-                      onChange={(e) => setCategoryFilter(e.target.value)}
-                    >
-                      {categories.map(c => <MenuItem key={c} value={c}>{c}</MenuItem>)}
-                    </Select>
-                  </FormControl>
-                </Grid>
-                <Grid item xs={6} md={3}>
-                  <FormControl fullWidth size="small">
-                    <InputLabel>Diet Format</InputLabel>
-                    <Select
-                      value={vegFilter}
-                      label="Diet Format"
-                      onChange={(e) => setVegFilter(e.target.value)}
-                    >
-                      <MenuItem value="All">All Diet formats</MenuItem>
-                      <MenuItem value="Veg">Vegetarian Only</MenuItem>
-                      <MenuItem value="Non-Veg">Non-Vegetarian Only</MenuItem>
-                    </Select>
-                  </FormControl>
-                </Grid>
-                <Grid item xs={12} md={2} sx={{ textAlign: 'right' }}>
-                  <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 600 }}>
-                    {filteredProducts.length} Items registered
-                  </Typography>
-                </Grid>
-              </Grid>
-            </CardContent>
-          </Card>
-
-          {/* Products Table */}
-          <TableContainer component={Card}>
-            <Table size="medium">
-              <TableHead>
-                <TableRow>
-                  <TableCell sx={{ fontWeight: 700 }}>Food Item</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Category</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }} align="right">Base Price</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }} align="right">Discount</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }} align="center">Prep Time</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }} align="center">Sell Tags</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }} align="center">Status</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }} align="center">Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {filteredProducts.map((p) => (
-                  <TableRow key={p.id} hover>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                        <Box 
-                          component="img" 
-                          src={p.image} 
-                          sx={{ width: 44, height: 44, borderRadius: 2, objectFit: 'cover' }} 
-                        />
-                        <Box>
-                          <Typography variant="body2" sx={{ fontWeight: 700 }}>{p.name}</Typography>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.2 }}>
-                            {p.isVeg ? (
-                              <Chip label="Veg" size="small" color="success" sx={{ height: 16, fontSize: '0.6rem', borderRadius: 0.5 }} />
-                            ) : (
-                              <Chip label="Non-Veg" size="small" color="error" sx={{ height: 16, fontSize: '0.6rem', borderRadius: 0.5 }} />
-                            )}
-                            <Typography variant="caption" sx={{ color: 'text.secondary' }}>GST: {p.gstRate}%</Typography>
-                          </Box>
-                        </Box>
-                      </Box>
-                    </TableCell>
-                    <TableCell>{p.category}</TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 700 }}>${p.price.toFixed(2)}</TableCell>
-                    <TableCell align="right">
-                      {p.discount > 0 ? (
-                        <Chip label={`${p.discount}% OFF`} color="primary" size="small" sx={{ fontWeight: 700, height: 18, fontSize: '0.65rem' }} />
-                      ) : (
-                        <Typography variant="body2" sx={{ color: 'text.secondary' }}>None</Typography>
-                      )}
-                    </TableCell>
-                    <TableCell align="center">
-                      <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
-                        <Hourglass size={12} color={theme.palette.text.secondary} />
-                        <Typography variant="body2">{p.preparationTime}m</Typography>
-                      </Box>
-                    </TableCell>
-                    <TableCell align="center">
-                      {p.isBestSeller && (
-                        <Chip label="Bestseller" color="secondary" size="small" sx={{ fontWeight: 700, height: 18, fontSize: '0.65rem' }} />
-                      )}
-                    </TableCell>
-                    <TableCell align="center">
-                      <FormControlLabel
-                        control={
-                          <Switch
-                            checked={p.availability}
-                            onChange={() => handleToggleAvailability(p.id)}
-                            color="success"
-                            size="small"
-                          />
-                        }
-                        label={
-                          <Typography variant="caption" sx={{ fontWeight: 700, color: p.availability ? 'success.main' : 'error.main' }}>
-                            {p.availability ? 'Active' : 'Sold Out'}
-                          </Typography>
-                        }
-                      />
-                    </TableCell>
-                    <TableCell align="center">
-                      <Box sx={{ display: 'flex', justifyContent: 'center', gap: 0.5 }}>
-                        <IconButton size="small" onClick={() => handleEditClick(p)}>
-                          <Edit2 size={15} />
-                        </IconButton>
-                        <IconButton size="small" color="error" onClick={() => handleDeleteProduct(p.id, p.name)}>
-                          <Trash2 size={15} />
-                        </IconButton>
-                      </Box>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </Box>
-      ) : (
-        // TAB 2: Shift / Scheduler configuration
-        <Box>
-          <Grid container spacing={3.5}>
-            {/* Shift Scheduler Selector */}
-            <Grid item xs={12} md={4}>
-              <Card>
-                <CardContent sx={{ p: 3, display: 'flex', flexDirection: 'column', gap: 2.5 }}>
-                  <Typography variant="h6" sx={{ fontFamily: 'Outfit', fontWeight: 700 }}>
-                    Shift Configuration
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                    Setup automatic hours schedules for dishes. Items mapped to breakfast will auto-pause after morning shift transitions.
-                  </Typography>
-
-                  <FormControl fullWidth>
-                    <InputLabel>Active Service Shift</InputLabel>
-                    <Select
-                      value={menuSchedule}
-                      label="Active Service Shift"
-                      onChange={(e) => setMenuSchedule(e.target.value as any)}
-                    >
-                      <MenuItem value="All">Full Time (All Service hours)</MenuItem>
-                      <MenuItem value="Breakfast">Breakfast hours (06:00 AM - 11:30 AM)</MenuItem>
-                      <MenuItem value="Lunch">Lunch hours (11:30 AM - 04:30 PM)</MenuItem>
-                      <MenuItem value="Dinner">Dinner hours (04:30 PM - 11:00 PM)</MenuItem>
-                      <MenuItem value="Late Night">Late Night hours (11:00 PM - 03:00 AM)</MenuItem>
-                    </Select>
-                  </FormControl>
-
-                  <Divider />
-                  
-                  <Box>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>Roster Statistics</Typography>
-                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                      Currently rendering {filteredProducts.length} items mapped to the <strong>{menuSchedule}</strong> shift configuration.
-                    </Typography>
-                  </Box>
-                </CardContent>
-              </Card>
-            </Grid>
-
-            {/* List Mapped Dishes */}
-            <Grid item xs={12} md={8}>
-              <Card>
-                <CardContent sx={{ p: 2.5 }}>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 700, fontFamily: 'Outfit', mb: 2 }}>
-                    Scheduled Dishes ({menuSchedule})
-                  </Typography>
-                  <TableContainer sx={{ maxHeight: 300 }}>
-                    <Table size="small">
-                      <TableHead>
-                        <TableRow>
-                          <TableCell sx={{ fontWeight: 700 }}>Food Item</TableCell>
-                          <TableCell sx={{ fontWeight: 700 }}>Category</TableCell>
-                          <TableCell sx={{ fontWeight: 700 }}>Availability Status</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {filteredProducts.map((p) => (
-                          <TableRow key={p.id} hover>
-                            <TableCell sx={{ fontWeight: 700 }}>{p.name}</TableCell>
-                            <TableCell>{p.category}</TableCell>
-                            <TableCell>
-                              <Chip 
-                                label={p.availability ? 'Active Shift' : 'Disabled'} 
-                                size="small" 
-                                color={p.availability ? 'success' : 'default'}
-                                sx={{ height: 18, fontSize: '0.65rem', fontWeight: 700 }}
-                              />
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
-                </CardContent>
-              </Card>
-            </Grid>
-          </Grid>
-        </Box>
-      )}
-
-      {/* Add / Edit product dialog */}
-      <Dialog open={productModalOpen} onClose={() => setProductModalOpen(false)} PaperProps={{ sx: { borderRadius: 4, width: 480 } }}>
-        <form onSubmit={handleProductSubmit}>
-          <DialogTitle sx={{ fontFamily: 'Outfit', fontWeight: 'bold' }}>
-            {editProduct ? 'Edit Catalog Product' : 'Register New Product'}
-          </DialogTitle>
-          <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
-            <TextField
-              fullWidth
-              size="small"
-              label="Dish Name"
-              value={prodName}
-              onChange={(e) => setProdName(e.target.value)}
-              required
-            />
-            <Grid container spacing={2}>
-              <Grid item xs={6}>
-                <FormControl fullWidth size="small">
-                  <InputLabel>Category</InputLabel>
-                  <Select
-                    value={prodCategory}
-                    label="Category"
-                    onChange={(e) => setProdCategory(e.target.value)}
-                  >
-                    <MenuItem value="Breakfast">Breakfast</MenuItem>
-                    <MenuItem value="Fast Food">Fast Food</MenuItem>
-                    <MenuItem value="Italian">Italian</MenuItem>
-                    <MenuItem value="Salads">Salads</MenuItem>
-                    <MenuItem value="Snacks">Snacks</MenuItem>
-                    <MenuItem value="Beverages">Beverages</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={6}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  label="Subcategory"
-                  value={prodSubcategory}
-                  onChange={(e) => setProdSubcategory(e.target.value)}
-                  placeholder="e.g. Burgers"
-                />
-              </Grid>
-            </Grid>
-
-            <Grid container spacing={2}>
-              <Grid item xs={6}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  type="number"
-                  label="Price ($)"
-                  value={prodPrice}
-                  onChange={(e) => setProdPrice(e.target.value)}
-                  required
-                />
-              </Grid>
-              <Grid item xs={6}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  type="number"
-                  label="Discount (%)"
-                  value={prodDiscount}
-                  onChange={(e) => setProdDiscount(e.target.value)}
-                />
-              </Grid>
-            </Grid>
-
-            <Grid container spacing={2}>
-              <Grid item xs={6}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  type="number"
-                  label="Prep Time (mins)"
-                  value={prodPrepTime}
-                  onChange={(e) => setProdPrepTime(e.target.value)}
-                />
-              </Grid>
-              <Grid item xs={6}>
-                <FormControl fullWidth size="small">
-                  <InputLabel>GST Tax Rate</InputLabel>
-                  <Select
-                    value={prodGst}
-                    label="GST Tax Rate"
-                    onChange={(e) => setProdGst(e.target.value)}
-                  >
-                    <MenuItem value="5">5% GST (Standard Food)</MenuItem>
-                    <MenuItem value="12">12% GST (Beverages/Ready)</MenuItem>
-                    <MenuItem value="18">18% GST (Luxury Services)</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-            </Grid>
-
-            <Box sx={{ display: 'flex', gap: 3 }}>
-              <FormControlLabel
-                control={<Checkbox checked={prodIsVeg} onChange={(e) => setProdIsVeg(e.target.checked)} color="success" />}
-                label={<Typography variant="body2">Vegetarian Item</Typography>}
+      <Card sx={{ mb: 3.5, borderRadius: 3, boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
+        <Tabs 
+          value={activeTab} 
+          onChange={(e, v) => setActiveTab(v)}
+          sx={{ px: 2, borderBottom: 1, borderColor: 'divider' }}
+        >
+          <Tab label="Products Roster" sx={{ fontWeight: 600, fontFamily: 'Outfit', fontSize: '1rem' }} />
+          <Tab label="Menu Time-Shift Mappings" sx={{ fontWeight: 600, fontFamily: 'Outfit', fontSize: '1rem' }} />
+        </Tabs>
+        
+        {activeTab === 0 && (
+          <Box sx={{ p: 2 }}>
+            <Box sx={{ display: 'flex', gap: 1.5, mb: 3, flexWrap: 'wrap' }}>
+              <TextField
+                size="small"
+                label="Search by name, SKU..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                sx={{ width: 260 }}
               />
-              <FormControlLabel
-                control={<Checkbox checked={prodBestSeller} onChange={(e) => setProdBestSeller(e.target.checked)} color="secondary" />}
-                label={<Typography variant="body2">Flag Bestseller</Typography>}
-              />
+              <FormControl size="small" sx={{ width: 160 }}>
+                <InputLabel>Category</InputLabel>
+                <Select value={categoryFilter} label="Category" onChange={(e) => setCategoryFilter(e.target.value)}>
+                  {categories.map(c => <MenuItem key={c} value={c}>{c}</MenuItem>)}
+                </Select>
+              </FormControl>
+              <FormControl size="small" sx={{ width: 140 }}>
+                <InputLabel>Dietary</InputLabel>
+                <Select value={vegFilter} label="Dietary" onChange={(e) => setCategoryFilter(e.target.value)}>
+                  <MenuItem value="All">All types</MenuItem>
+                  <MenuItem value="Veg">Vegetarian</MenuItem>
+                  <MenuItem value="Non-Veg">Non-Veg</MenuItem>
+                </Select>
+              </FormControl>
             </Box>
 
-            <TextField
-              fullWidth
-              multiline
-              rows={3}
-              label="Dish Description"
-              value={prodDesc}
-              onChange={(e) => setProdDesc(e.target.value)}
-              placeholder="Enter details on spices, allergen warnings, or nutritional facts..."
-            />
+            <TableContainer>
+              {loading ? (
+                <Box sx={{ p: 4, textAlign: 'center' }}><CircularProgress /></Box>
+              ) : (
+                <Table size="small">
+                  <TableHead>
+                    <TableRow sx={{ bgcolor: 'rgba(0,0,0,0.02)' }}>
+                      <TableCell sx={{ fontWeight: 700 }}>Item Details</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }}>Category</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }} align="right">Selling Price</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }} align="center">Kitchen Prep</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }} align="center">Status</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }} align="right">Actions</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {products.map((prod) => (
+                      <TableRow key={prod.id} hover>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                            <Box 
+                              component="img" 
+                              src={prod.image}
+                              sx={{ width: 44, height: 44, borderRadius: 1.5, objectFit: 'cover' }}
+                            />
+                            <Box>
+                              <Typography variant="body2" sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                {prod.isVeg ? (
+                                  <Box sx={{ width: 12, height: 12, border: '1px solid green', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: 'green' }} />
+                                  </Box>
+                                ) : (
+                                  <Box sx={{ width: 12, height: 12, border: '1px solid red', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: 'red' }} />
+                                  </Box>
+                                )}
+                                {prod.name}
+                              </Typography>
+                              <Typography variant="caption" sx={{ color: 'text.secondary' }}>ID: {prod.id.slice(0,8)}</Typography>
+                            </Box>
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Chip label={prod.category} size="small" sx={{ borderRadius: 1.5, fontWeight: 600, fontSize: '0.7rem' }} />
+                        </TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 700 }}>
+                          ${prod.price.toFixed(2)}
+                          {prod.discount > 0 && (
+                            <Typography variant="caption" sx={{ display: 'block', color: 'success.main', fontWeight: 600 }}>
+                              -{prod.discount}% Off
+                            </Typography>
+                          )}
+                        </TableCell>
+                        <TableCell align="center">
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5, color: 'text.secondary' }}>
+                            <UtensilsCrossed size={14} />
+                            <Typography variant="body2">{prod.preparationTime} min</Typography>
+                          </Box>
+                        </TableCell>
+                        <TableCell align="center">
+                          <Switch 
+                            checked={prod.availability} 
+                            color="success" 
+                            size="small"
+                            onChange={() => handleToggleAvailability(prod.id, prod.availability, prod.name)}
+                          />
+                        </TableCell>
+                        <TableCell align="right">
+                          <IconButton size="small" onClick={() => handleEditClick(prod)} color="primary">
+                            <Edit2 size={16} />
+                          </IconButton>
+                          <IconButton size="small" onClick={() => handleDeleteProduct(prod.id, prod.name)} color="error">
+                            <Trash2 size={16} />
+                          </IconButton>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </TableContainer>
+            <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center' }}>
+                <Pagination count={Math.ceil(total / size) || 1} page={page} onChange={(_, p) => setPage(p)} color="primary" />
+            </Box>
+          </Box>
+        )}
+        
+        {activeTab === 1 && (
+          <Box sx={{ p: 3 }}>
+            <Alert severity="info" icon={<Hourglass size={20} />} sx={{ mb: 3 }}>
+              Map your products to specific time windows. Products not mapped to an active shift will be hidden from customer apps during that time.
+            </Alert>
+            <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
+              {['All', 'Breakfast', 'Lunch', 'Dinner', 'Late Night'].map((shift) => (
+                <Button 
+                  key={shift}
+                  variant={menuSchedule === shift ? 'contained' : 'outlined'}
+                  onClick={() => setMenuSchedule(shift as any)}
+                  sx={{ borderRadius: 6, px: 3 }}
+                >
+                  {shift}
+                </Button>
+              ))}
+            </Box>
+            <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 700 }}>
+              {products.length} Products configured for {menuSchedule} shift
+            </Typography>
+            <Grid container spacing={2}>
+              {products.map(prod => (
+                <Grid item xs={12} sm={6} md={4} key={prod.id}>
+                  <Card variant="outlined">
+                    <CardContent sx={{ p: 1.5, display: 'flex', alignItems: 'center', gap: 1.5, pb: '12px !important' }}>
+                      <Box component="img" src={prod.image} sx={{ width: 40, height: 40, borderRadius: 1 }} />
+                      <Box sx={{ flexGrow: 1 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 700 }}>{prod.name}</Typography>
+                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>{prod.category}</Typography>
+                      </Box>
+                      <Check size={18} color="green" />
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ))}
+            </Grid>
+          </Box>
+        )}
+      </Card>
 
-            <FormControl fullWidth size="small">
-              <InputLabel>Mapped Outlets</InputLabel>
-              <Select
-                multiple
-                value={prodOutlets}
-                label="Mapped Outlets"
-                onChange={(e) => setProdOutlets(typeof e.target.value === 'string' ? e.target.value.split(',') : e.target.value)}
-                renderValue={(selected) => selected.map(id => outlets.find(o => o.id === id)?.name.split(' ')[0]).join(', ')}
-              >
-                {outlets.map((o) => (
-                  <MenuItem key={o.id} value={o.id}>
-                    <Checkbox checked={prodOutlets.indexOf(o.id) > -1} />
-                    <ListItemText primary={o.name} />
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+      <Dialog open={productModalOpen} onClose={() => setProductModalOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle sx={{ fontFamily: 'Outfit', fontWeight: 700, pb: 1 }}>
+          {editProduct ? 'Modify Menu Item' : 'Add New Menu Item'}
+        </DialogTitle>
+        <Divider />
+        <form onSubmit={handleProductSubmit}>
+          <DialogContent sx={{ p: 3 }}>
+            <Grid container spacing={3}>
+              <Grid item xs={12} sm={8}>
+                <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Core Identification</Typography>
+                <Card variant="outlined" sx={{ p: 2 }}>
+                  <Grid container spacing={2}>
+                    <Grid item xs={12}>
+                      <TextField label="Product Name" fullWidth size="small" value={prodName} onChange={(e) => setProdName(e.target.value)} required />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <FormControl fullWidth size="small">
+                        <InputLabel>Category</InputLabel>
+                        <Select value={prodCategory} label="Category" onChange={(e) => setProdCategory(e.target.value)}>
+                          {categories.filter(c => c !== 'All').map(c => <MenuItem key={c} value={c}>{c}</MenuItem>)}
+                        </Select>
+                      </FormControl>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <TextField label="Subcategory" fullWidth size="small" value={prodSubcategory} onChange={(e) => setProdSubcategory(e.target.value)} />
+                    </Grid>
+                    <Grid item xs={12}>
+                      <TextField label="Description" fullWidth multiline rows={2} size="small" value={prodDesc} onChange={(e) => setProdDesc(e.target.value)} />
+                    </Grid>
+                  </Grid>
+                </Card>
+              </Grid>
+
+              <Grid item xs={12} sm={4}>
+                <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Pricing Strategy</Typography>
+                <Card variant="outlined" sx={{ p: 2 }}>
+                  <Grid container spacing={2}>
+                    <Grid item xs={12}>
+                      <TextField label="Base Selling Price" type="number" fullWidth size="small" value={prodPrice} onChange={(e) => setProdPrice(e.target.value)} required />
+                    </Grid>
+                    <Grid item xs={12}>
+                      <TextField label="Discount (%)" type="number" fullWidth size="small" value={prodDiscount} onChange={(e) => setProdDiscount(e.target.value)} />
+                    </Grid>
+                    <Grid item xs={12}>
+                      <TextField label="Tax / GST (%)" type="number" fullWidth size="small" value={prodGst} onChange={(e) => setProdGst(e.target.value)} />
+                    </Grid>
+                  </Grid>
+                </Card>
+              </Grid>
+
+              <Grid item xs={12}>
+                <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Kitchen & Compliance</Typography>
+                <Card variant="outlined" sx={{ p: 2 }}>
+                  <Grid container spacing={2} alignItems="center">
+                    <Grid item xs={12} sm={4}>
+                      <TextField label="Prep Time (minutes)" type="number" fullWidth size="small" value={prodPrepTime} onChange={(e) => setProdPrepTime(e.target.value)} />
+                    </Grid>
+                    <Grid item xs={12} sm={3}>
+                      <FormControlLabel control={<Checkbox checked={prodIsVeg} onChange={(e) => setProdIsVeg(e.target.checked)} />} label="Vegetarian" />
+                    </Grid>
+                    <Grid item xs={12} sm={5}>
+                      <FormControlLabel control={<Checkbox checked={prodBestSeller} onChange={(e) => setProdBestSeller(e.target.checked)} />} label="Mark as Best Seller Badge" />
+                    </Grid>
+                  </Grid>
+                </Card>
+              </Grid>
+            </Grid>
           </DialogContent>
-          <DialogActions sx={{ p: 2 }}>
-            <Button onClick={() => setProductModalOpen(false)}>Cancel</Button>
-            <Button type="submit" variant="contained" color="primary">
-              {editProduct ? 'Save Adjustments' : 'Add to Catalog'}
+          <Divider />
+          <DialogActions sx={{ p: 2, px: 3 }}>
+            <Button onClick={() => setProductModalOpen(false)} sx={{ textTransform: 'none' }}>Cancel</Button>
+            <Button type="submit" variant="contained" sx={{ textTransform: 'none', borderRadius: 2 }}>
+              {editProduct ? 'Save Changes' : 'Publish Product'}
             </Button>
           </DialogActions>
         </form>
       </Dialog>
 
-      {/* Bulk actions Dialog */}
-      <Dialog open={bulkOpen} onClose={() => setBulkOpen(false)} PaperProps={{ sx: { borderRadius: 3, width: 400 } }}>
-        <DialogTitle sx={{ fontFamily: 'Outfit', fontWeight: 'bold' }}>Bulk Menu Actions</DialogTitle>
-        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, pt: 1 }}>
-          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-            Download product ledger templates as sheets, edit prices in bulk, and upload back to the system.
-          </Typography>
+      <Dialog open={bulkOpen} onClose={() => setBulkStatus('idle') === undefined && setBulkOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontFamily: 'Outfit', fontWeight: 700 }}>Bulk Operations Wizard</DialogTitle>
+        <DialogContent dividers sx={{ display: 'flex', flexDirection: 'column', gap: 3, pt: 3 }}>
+          {bulkStatus === 'idle' && (
+            <>
+              <Alert severity="info">Download our standardized CSV template to bulk upload or edit thousands of products at once.</Alert>
+              <Box sx={{ display: 'flex', gap: 2 }}>
+                <Button variant="outlined" startIcon={<Download size={18} />} fullWidth sx={{ py: 1.5, borderRadius: 2 }}>
+                  Download CSV Template
+                </Button>
+                <Button variant="contained" startIcon={<FileSpreadsheet size={18} />} fullWidth onClick={handleBulkUpload} sx={{ py: 1.5, borderRadius: 2 }}>
+                  Upload Completed CSV
+                </Button>
+              </Box>
+            </>
+          )}
 
-          <Button 
-            variant="outlined" 
-            color="secondary" 
-            fullWidth
-            onClick={() => alert('Simulated CSV catalog template downloaded.')}
-            startIcon={<FileSpreadsheet size={18} />}
-            sx={{ py: 1.2, borderRadius: 2 }}
-          >
-            Download CSV Catalog Template
-          </Button>
-
-          <Divider sx={{ my: 1 }} />
-
-          {bulkStatus === 'idle' ? (
-            <Button 
-              variant="contained" 
-              color="primary"
-              fullWidth
-              onClick={handleBulkUpload}
-              startIcon={<Upload size={18} />}
-              sx={{ py: 1.2, borderRadius: 2 }}
-            >
-              Simulate CSV File Import
-            </Button>
-          ) : bulkStatus === 'importing' ? (
-            <Box>
-              <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 0.5 }}>
-                Uploading sheets... {bulkProgress}%
-              </Typography>
-              <LinearProgress variant="determinate" value={bulkProgress} sx={{ height: 6, borderRadius: 1 }} />
+          {bulkStatus === 'importing' && (
+            <Box sx={{ textAlign: 'center', py: 4 }}>
+              <Hourglass size={48} color={theme.palette.primary.main} style={{ animation: 'spin 2s linear infinite' }} />
+              <Typography variant="h6" sx={{ mt: 2, fontFamily: 'Outfit' }}>Validating & Importing Rows...</Typography>
+              <LinearProgress variant="determinate" value={bulkProgress} sx={{ mt: 3, height: 8, borderRadius: 4 }} />
+              <Typography variant="caption" sx={{ mt: 1, display: 'block', color: 'text.secondary' }}>{bulkProgress}% Completed</Typography>
             </Box>
-          ) : (
-            <Alert severity="success" sx={{ borderRadius: 2 }} icon={<Check size={18} />}>
-              Import catalog records processing successfully.
-            </Alert>
+          )}
+
+          {bulkStatus === 'completed' && (
+            <Box sx={{ textAlign: 'center', py: 4 }}>
+              <Box sx={{ width: 64, height: 64, borderRadius: '50%', bgcolor: 'success.light', color: 'success.dark', display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 2 }}>
+                <Check size={32} />
+              </Box>
+              <Typography variant="h5" sx={{ fontFamily: 'Outfit', fontWeight: 700 }}>Import Successful!</Typography>
+              <Typography variant="body2" sx={{ color: 'text.secondary', mt: 1 }}>18 new items have been added to the master inventory catalog.</Typography>
+            </Box>
           )}
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => { setBulkOpen(false); setBulkStatus('idle'); }}>Close</Button>
+          <Button onClick={() => setBulkOpen(false)} disabled={bulkStatus === 'importing'}>Close Window</Button>
         </DialogActions>
       </Dialog>
     </Box>

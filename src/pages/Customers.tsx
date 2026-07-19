@@ -1,112 +1,161 @@
-import React, { useState } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useDispatch } from 'react-redux';
 import { 
   Box, Typography, Card, CardContent, Table, TableBody, TableCell, 
   TableContainer, TableHead, TableRow, Chip, IconButton, Button, 
-  Drawer, Divider, TextField, Alert, useTheme, Grid 
+  Drawer, Divider, TextField, Alert, useTheme, Grid, Dialog, DialogTitle,
+  DialogContent, DialogActions, CircularProgress, Pagination
 } from '@mui/material';
 import { 
   Search, Eye, ShieldAlert, ShieldCheck, Wallet, 
-  Award, Heart, ShoppingBag, Plus, Minus, X
+  Award, Heart, ShoppingBag, Plus, Minus, X, UserPlus
 } from 'lucide-react';
-import { 
-  RootState, updateCustomerStatus, adjustCustomerWallet, 
-  addAuditLog, addNotification 
-} from '../store';
+import { addNotification } from '../store';
+import { customerService, Customer, Address, WalletTransaction } from '../services/customerService';
 
 const Customers: React.FC = () => {
   const theme = useTheme();
   const dispatch = useDispatch();
 
-  const currentUser = useSelector((state: RootState) => state.auth.user);
-  const customers = useSelector((state: RootState) => state.db.customers);
-  const orders = useSelector((state: RootState) => state.db.orders);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const size = 10;
 
   const [search, setSearch] = useState('');
-  const [selectedCustId, setSelectedCustId] = useState<string | null>(null);
+  const [debouncedSearch, setDebouncedSearch] = useState('');
 
+  const [selectedCustId, setSelectedCustId] = useState<string | null>(null);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  
   const [walletAmount, setWalletAmount] = useState('');
   const [walletDesc, setWalletDesc] = useState('');
   const [showWalletAdjust, setShowWalletAdjust] = useState(false);
-  const [editAddresses, setEditAddresses] = useState<Record<string, string[]>>({});
+  
+  const [addresses, setAddresses] = useState<Address[]>([]);
+  const [walletHistory, setWalletHistory] = useState<WalletTransaction[]>([]);
+  const [loadingDetails, setLoadingDetails] = useState(false);
 
-  const selectedCustomer = customers.find(c => c.id === selectedCustId);
+  // New Customer Modal
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [newCust, setNewCust] = useState({ full_name: '', email: '', mobile_number: '' });
 
-  // Filter orders related to customer
-  const customerOrders = orders.filter(o => o.customerId === selectedCustId);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 500);
+    return () => clearTimeout(timer);
+  }, [search]);
 
-  const filteredCustomers = customers.filter(c => 
-    c.name.toLowerCase().includes(search.toLowerCase()) || 
-    c.email.toLowerCase().includes(search.toLowerCase()) ||
-    c.phone.includes(search)
-  );
+  const fetchCustomers = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await customerService.getCustomers(page, size, debouncedSearch);
+      setCustomers(res.data);
+      setTotal(res.total);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  }, [page, size, debouncedSearch]);
 
-  const handleToggleBlock = (id: string, name: string, currentStatus: string) => {
-    const nextStatus = currentStatus === 'Blocked' ? 'Active' : 'Blocked';
-    dispatch(updateCustomerStatus({ id, status: nextStatus }));
+  useEffect(() => {
+    fetchCustomers();
+  }, [fetchCustomers]);
 
-    dispatch(addNotification({
-      title: 'Customer Status Altered',
-      description: `${name} has been ${nextStatus.toLowerCase()} from ordering.`,
-      type: 'system'
-    }));
-
-    dispatch(addAuditLog({
-      username: currentUser?.email || 'Simulator Client',
-      role: currentUser?.role || 'Guest',
-      action: `${nextStatus} customer ${name} (ID: ${id})`,
-      module: 'Customers',
-      ipAddress: '127.0.0.1',
-      browser: 'Admin Console'
-    }));
+  const loadCustomerDetails = async (id: string) => {
+    try {
+      setLoadingDetails(true);
+      setSelectedCustId(id);
+      
+      const [cust, addr, hist] = await Promise.all([
+        customerService.getCustomer(id),
+        customerService.getAddresses(id),
+        customerService.getWalletHistory(id)
+      ]);
+      
+      setSelectedCustomer(cust);
+      setAddresses(addr);
+      setWalletHistory(hist);
+    } catch (error) {
+      console.error(error);
+      setSelectedCustId(null);
+    } finally {
+      setLoadingDetails(false);
+    }
   };
 
-  const handleWalletAdjustSubmit = (isCredit: boolean) => {
+  const handleToggleBlock = async (customer: Customer) => {
+    try {
+      if (customer.status === 'Blocked') {
+        await customerService.unblockCustomer(customer.id);
+        dispatch(addNotification({ title: 'Success', description: `${customer.full_name} unblocked`, type: 'system' }));
+      } else {
+        await customerService.blockCustomer(customer.id);
+        dispatch(addNotification({ title: 'Warning', description: `${customer.full_name} blocked`, type: 'system' }));
+      }
+      fetchCustomers();
+      if (selectedCustomer?.id === customer.id) {
+        loadCustomerDetails(customer.id);
+      }
+    } catch (error) {
+      console.error("Failed to block/unblock", error);
+    }
+  };
+
+  const handleWalletAdjustSubmit = async (isCredit: boolean) => {
     if (!selectedCustomer || !walletAmount || !walletDesc) return;
     const value = parseFloat(walletAmount);
-    if (isNaN(value)) return;
+    if (isNaN(value) || value <= 0) return;
 
     const amount = isCredit ? value : -value;
 
-    dispatch(adjustCustomerWallet({
-      id: selectedCustomer.id,
-      amount,
-      description: walletDesc
-    }));
+    try {
+      await customerService.adjustWallet(selectedCustomer.id, amount, walletDesc);
+      dispatch(addNotification({
+        title: 'Wallet Adjusted',
+        description: `Successfully adjusted by $${amount.toFixed(2)}`,
+        type: 'system'
+      }));
+      setWalletAmount('');
+      setWalletDesc('');
+      setShowWalletAdjust(false);
+      
+      // Refresh details
+      loadCustomerDetails(selectedCustomer.id);
+      fetchCustomers();
+    } catch (error) {
+      console.error("Wallet adjust failed", error);
+    }
+  };
 
-    dispatch(addNotification({
-      title: 'Customer Wallet Adjust',
-      description: `Adjusted ${selectedCustomer.name}'s wallet by $${amount.toFixed(2)}`,
-      type: 'system'
-    }));
-
-    dispatch(addAuditLog({
-      username: currentUser?.email || 'Simulator Client',
-      role: currentUser?.role || 'Guest',
-      action: `Wallet adjustment for ${selectedCustomer.name}: $${amount.toFixed(2)}. Desc: ${walletDesc}`,
-      module: 'Customers',
-      ipAddress: '127.0.0.1',
-      browser: 'Admin Console'
-    }));
-
-    setWalletAmount('');
-    setWalletDesc('');
-    setShowWalletAdjust(false);
+  const handleCreateCustomer = async () => {
+    if (!newCust.full_name || !newCust.email || !newCust.mobile_number) return;
+    try {
+      await customerService.createCustomer(newCust);
+      dispatch(addNotification({ title: 'Created', description: 'Customer created successfully', type: 'system' }));
+      setCreateModalOpen(false);
+      setNewCust({ full_name: '', email: '', mobile_number: '' });
+      fetchCustomers();
+    } catch (error) {
+      console.error("Creation failed", error);
+    }
   };
 
   return (
     <Box>
-      {/* Title */}
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" sx={{ fontFamily: 'Outfit', fontWeight: 800 }}>
-          Customer Registry
-        </Typography>
-        <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
-          Monitor customer order history profiles, configure wallet ledgers, and manage security blocks
-        </Typography>
+      <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Box>
+          <Typography variant="h4" sx={{ fontFamily: 'Outfit', fontWeight: 800 }}>Customer Registry</Typography>
+          <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
+            Monitor customer profiles, wallets, and addresses
+          </Typography>
+        </Box>
+        <Button variant="contained" startIcon={<UserPlus size={18} />} onClick={() => setCreateModalOpen(true)}>
+          Add Customer
+        </Button>
       </Box>
 
-      {/* Filters card */}
       <Card sx={{ mb: 3 }}>
         <CardContent sx={{ p: 2 }}>
           <Grid container spacing={2} alignItems="center">
@@ -125,68 +174,76 @@ const Customers: React.FC = () => {
             </Grid>
             <Grid item xs={12} md={6} sx={{ textAlign: 'right' }}>
               <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 600 }}>
-                Showing {filteredCustomers.length} registered customers
+                Total {total} customers found
               </Typography>
             </Grid>
           </Grid>
         </CardContent>
       </Card>
 
-      {/* Grid of Users */}
       <TableContainer component={Card}>
-        <Table size="medium">
-          <TableHead>
-            <TableRow>
-              <TableCell sx={{ fontWeight: 700 }}>Customer Name</TableCell>
-              <TableCell sx={{ fontWeight: 700 }}>Contact Email</TableCell>
-              <TableCell sx={{ fontWeight: 700 }}>Phone Number</TableCell>
-              <TableCell sx={{ fontWeight: 700 }} align="right">Wallet Balance</TableCell>
-              <TableCell sx={{ fontWeight: 700 }} align="right">Reward Points</TableCell>
-              <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
-              <TableCell sx={{ fontWeight: 700 }} align="center">Actions</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {filteredCustomers.map((c) => (
-              <TableRow key={c.id} hover>
-                <TableCell sx={{ fontWeight: 700 }}>{c.name}</TableCell>
-                <TableCell>{c.email}</TableCell>
-                <TableCell>{c.phone}</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 700 }}>
-                  ${c.walletBalance.toFixed(2)}
-                </TableCell>
-                <TableCell align="right" sx={{ fontWeight: 700, color: 'secondary.main' }}>
-                  {c.rewardPoints} pts
-                </TableCell>
-                <TableCell>
-                  <Chip 
-                    label={c.status} 
-                    size="small" 
-                    color={c.status === 'Blocked' ? 'error' : 'success'}
-                    sx={{ fontWeight: 700, borderRadius: '6px' }}
-                  />
-                </TableCell>
-                <TableCell align="center">
-                  <Box sx={{ display: 'flex', justifyContent: 'center', gap: 0.5 }}>
-                    <IconButton size="small" color="primary" onClick={() => setSelectedCustId(c.id)}>
-                      <Eye size={17} />
-                    </IconButton>
-                    <IconButton 
-                      size="small" 
-                      color={c.status === 'Blocked' ? 'success' : 'error'}
-                      onClick={() => handleToggleBlock(c.id, c.name, c.status)}
-                    >
-                      {c.status === 'Blocked' ? <ShieldCheck size={17} /> : <ShieldAlert size={17} />}
-                    </IconButton>
-                  </Box>
-                </TableCell>
+        {loading ? (
+          <Box sx={{ p: 4, textAlign: 'center' }}><CircularProgress /></Box>
+        ) : (
+          <Table size="medium">
+            <TableHead>
+              <TableRow>
+                <TableCell sx={{ fontWeight: 700 }}>Customer Name</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Contact Email</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Phone Number</TableCell>
+                <TableCell sx={{ fontWeight: 700 }} align="right">Wallet Balance</TableCell>
+                <TableCell sx={{ fontWeight: 700 }} align="right">Reward Points</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
+                <TableCell sx={{ fontWeight: 700 }} align="center">Actions</TableCell>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHead>
+            <TableBody>
+              {customers.map((c) => (
+                <TableRow key={c.id} hover>
+                  <TableCell sx={{ fontWeight: 700 }}>{c.full_name}</TableCell>
+                  <TableCell>{c.email}</TableCell>
+                  <TableCell>{c.mobile_number}</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}>${c.wallet_balance.toFixed(2)}</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700, color: 'secondary.main' }}>{c.reward_points} pts</TableCell>
+                  <TableCell>
+                    <Chip 
+                      label={c.status} 
+                      size="small" 
+                      color={c.status === 'Blocked' ? 'error' : 'success'}
+                      sx={{ fontWeight: 700, borderRadius: '6px' }}
+                    />
+                  </TableCell>
+                  <TableCell align="center">
+                    <Box sx={{ display: 'flex', justifyContent: 'center', gap: 0.5 }}>
+                      <IconButton size="small" color="primary" onClick={() => loadCustomerDetails(c.id)}>
+                        <Eye size={17} />
+                      </IconButton>
+                      <IconButton 
+                        size="small" 
+                        color={c.status === 'Blocked' ? 'success' : 'error'}
+                        onClick={() => handleToggleBlock(c)}
+                      >
+                        {c.status === 'Blocked' ? <ShieldCheck size={17} /> : <ShieldAlert size={17} />}
+                      </IconButton>
+                    </Box>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </TableContainer>
 
-      {/* Customer Detail Drawer */}
+      <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center' }}>
+        <Pagination 
+          count={Math.ceil(total / size) || 1} 
+          page={page} 
+          onChange={(_, p) => setPage(p)} 
+          color="primary" 
+        />
+      </Box>
+
+      {/* Drawer */}
       <Drawer
         anchor="right"
         open={Boolean(selectedCustId)}
@@ -194,15 +251,15 @@ const Customers: React.FC = () => {
         sx={{ zIndex: 1300 }}
         PaperProps={{ sx: { width: { xs: '100%', sm: 460 }, p: 0, display: 'flex', flexDirection: 'column', height: '100%' } }}
       >
-        {selectedCustomer && (
+        {loadingDetails ? (
+           <Box sx={{ p: 4, textAlign: 'center' }}><CircularProgress /></Box>
+        ) : selectedCustomer && (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, height: '100%', overflowY: 'auto', p: 3 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <Box>
-                <Typography variant="h5" sx={{ fontFamily: 'Outfit', fontWeight: 800 }}>
-                  Customer Profile
-                </Typography>
-                <Typography variant="body2" sx={{ color: 'text.secondary', mt: 1.5, lineHeight: 1.6 }}>
-                  Registered details and past transaction summaries for <strong>{selectedCustomer.name}</strong>
+                <Typography variant="h5" sx={{ fontFamily: 'Outfit', fontWeight: 800 }}>Customer Profile</Typography>
+                <Typography variant="body2" sx={{ color: 'text.secondary', mt: 1.5 }}>
+                  <strong>{selectedCustomer.full_name}</strong> - {selectedCustomer.email}
                 </Typography>
               </Box>
               <IconButton onClick={() => { setSelectedCustId(null); setShowWalletAdjust(false); }} size="small">
@@ -212,7 +269,6 @@ const Customers: React.FC = () => {
 
             <Divider />
 
-            {/* Quick Stats */}
             <Grid container spacing={2}>
               <Grid item xs={6}>
                 <Card sx={{ bgcolor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.01)' : 'rgba(0,0,0,0.01)' }}>
@@ -221,7 +277,7 @@ const Customers: React.FC = () => {
                       <Wallet size={16} />
                       <Typography variant="caption" sx={{ fontWeight: 700 }}>Wallet Balance</Typography>
                     </Box>
-                    <Typography variant="h6" sx={{ fontWeight: 800 }}>${selectedCustomer.walletBalance.toFixed(2)}</Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 800 }}>${selectedCustomer.wallet_balance.toFixed(2)}</Typography>
                   </CardContent>
                 </Card>
               </Grid>
@@ -232,44 +288,24 @@ const Customers: React.FC = () => {
                       <Award size={16} />
                       <Typography variant="caption" sx={{ fontWeight: 700 }}>Reward Points</Typography>
                     </Box>
-                    <Typography variant="h6" sx={{ fontWeight: 800 }}>{selectedCustomer.rewardPoints} pts</Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 800 }}>{selectedCustomer.reward_points} pts</Typography>
                   </CardContent>
                 </Card>
               </Grid>
             </Grid>
 
-            {/* Wallet Adjust Buttons */}
             <Box>
-              <Button 
-                variant="outlined" 
-                size="small" 
-                onClick={() => setShowWalletAdjust(!showWalletAdjust)}
-                startIcon={<Wallet size={14} />}
-              >
+              <Button variant="outlined" size="small" onClick={() => setShowWalletAdjust(!showWalletAdjust)} startIcon={<Wallet size={14} />}>
                 Adjust Wallet Ledger
               </Button>
             </Box>
 
-            {/* Wallet adjust card */}
             {showWalletAdjust && (
               <Card sx={{ border: `1px solid ${theme.palette.divider}` }}>
                 <CardContent sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                   <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Wallet Credit/Debit Panel</Typography>
-                  <TextField
-                    size="small"
-                    type="number"
-                    label="Transaction Amount ($)"
-                    value={walletAmount}
-                    onChange={(e) => setWalletAmount(e.target.value)}
-                    inputProps={{ min: 0, step: 'any' }}
-                  />
-                  <TextField
-                    size="small"
-                    label="Adjustment Description"
-                    value={walletDesc}
-                    onChange={(e) => setWalletDesc(e.target.value)}
-                    placeholder="e.g. Campaign credit reward"
-                  />
+                  <TextField size="small" type="number" label="Amount ($)" value={walletAmount} onChange={(e) => setWalletAmount(e.target.value)} />
+                  <TextField size="small" label="Description" value={walletDesc} onChange={(e) => setWalletDesc(e.target.value)} />
                   <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
                     <Button size="small" onClick={() => setShowWalletAdjust(false)}>Cancel</Button>
                     <Button size="small" variant="contained" color="error" startIcon={<Minus size={13} />} onClick={() => handleWalletAdjustSubmit(false)}>Debit</Button>
@@ -279,84 +315,57 @@ const Customers: React.FC = () => {
               </Card>
             )}
 
-            {/* Addresses list */}
             <Box>
-              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, fontFamily: 'Outfit' }}>Delivery Addresses</Typography>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                {(editAddresses[selectedCustomer.id] ?? selectedCustomer.addresses).map((addr, idx) => (
-                  <TextField
-                    key={idx}
-                    size="small"
-                    fullWidth
-                    value={addr}
-                    onChange={(e) => {
-                      const updated = [...(editAddresses[selectedCustomer.id] ?? selectedCustomer.addresses)];
-                      updated[idx] = e.target.value;
-                      setEditAddresses(prev => ({ ...prev, [selectedCustomer.id]: updated }));
-                    }}
-                    sx={{
-                      '& .MuiOutlinedInput-root': { borderRadius: 2 },
-                      '& .MuiInputBase-input': { fontSize: '0.875rem' }
-                    }}
-                  />
-                ))}
-              </Box>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>Delivery Addresses</Typography>
+              {addresses.length === 0 ? <Typography variant="body2">No addresses</Typography> : (
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                  {addresses.map((addr) => (
+                    <Card key={addr.id} variant="outlined" sx={{ p: 1.5 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>{addr.address_type}</Typography>
+                      <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                        {addr.address_line}, {addr.city}, {addr.state} {addr.postal_code}
+                      </Typography>
+                    </Card>
+                  ))}
+                </Box>
+              )}
             </Box>
 
-            {/* Favorites items */}
             <Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                <Heart size={16} color={theme.palette.error.main} fill={theme.palette.error.main} />
-                <Typography variant="subtitle2" sx={{ fontWeight: 700, fontFamily: 'Outfit' }}>Favorite Items</Typography>
-              </Box>
-              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                {selectedCustomer.favoriteItems.map(item => (
-                  <Chip key={item} label={item} size="small" variant="outlined" />
-                ))}
-              </Box>
-            </Box>
-
-            {/* Past orders list */}
-            <Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-                <ShoppingBag size={16} color={theme.palette.secondary.main} />
-                <Typography variant="subtitle2" sx={{ fontWeight: 700, fontFamily: 'Outfit' }}>
-                  Purchase History ({customerOrders.length})
-                </Typography>
-              </Box>
-              {customerOrders.length === 0 ? (
-                <Typography variant="body2" sx={{ color: 'text.secondary' }}>No orders found for this customer.</Typography>
-              ) : (
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                  {customerOrders.map(o => (
-                    <Box 
-                      key={o.id}
-                      sx={{ 
-                        p: 1.5, 
-                        border: `1px solid ${theme.palette.divider}`, 
-                        borderRadius: 2,
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center'
-                      }}
-                    >
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>Wallet History</Typography>
+              {walletHistory.length === 0 ? <Typography variant="body2">No transactions</Typography> : (
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                  {walletHistory.map((w) => (
+                    <Box key={w.id} sx={{ display: 'flex', justifyContent: 'space-between', p: 1, borderBottom: '1px solid #eee' }}>
                       <Box>
-                        <Typography variant="body2" sx={{ fontWeight: 700, color: 'primary.main' }}>
-                          #{o.id.split('-')[1]}
-                        </Typography>
-                        <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
-                          {new Date(o.createdAt).toLocaleDateString()} | {o.items.map(it => `${it.quantity}x ${it.name}`).join(', ')}
-                        </Typography>
+                        <Typography variant="body2">{w.reason}</Typography>
+                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>{new Date(w.created_at).toLocaleDateString()}</Typography>
                       </Box>
-                      <Typography variant="body2" sx={{ fontWeight: 800 }}>${o.total.toFixed(2)}</Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 700, color: w.transaction_type === 'Credit' ? 'success.main' : 'error.main' }}>
+                        {w.transaction_type === 'Credit' ? '+' : '-'}${w.amount.toFixed(2)}
+                      </Typography>
                     </Box>
                   ))}
                 </Box>
               )}
             </Box>
+
           </Box>
         )}
       </Drawer>
+
+      <Dialog open={createModalOpen} onClose={() => setCreateModalOpen(false)}>
+        <DialogTitle>Add New Customer</DialogTitle>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
+          <TextField label="Full Name" size="small" value={newCust.full_name} onChange={(e) => setNewCust({...newCust, full_name: e.target.value})} />
+          <TextField label="Email" size="small" value={newCust.email} onChange={(e) => setNewCust({...newCust, email: e.target.value})} />
+          <TextField label="Mobile Number" size="small" value={newCust.mobile_number} onChange={(e) => setNewCust({...newCust, mobile_number: e.target.value})} />
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setCreateModalOpen(false)}>Cancel</Button>
+          <Button variant="contained" onClick={handleCreateCustomer}>Create</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

@@ -1,124 +1,171 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { 
   Box, Typography, Card, CardContent, Grid, Button, Switch, 
-  FormControlLabel, TextField, Divider, Alert, LinearProgress, 
-  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, useTheme, Chip
+  FormControlLabel, TextField, Alert, LinearProgress, 
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, useTheme, Chip,
+  CircularProgress
 } from '@mui/material';
 import { 
-  Settings, Key, Database, RefreshCcw, Save, ShieldCheck, 
+  Settings, Key, Database, RefreshCcw, Save, 
   Server, MessageSquare, Landmark, Map 
 } from 'lucide-react';
 import { RootState, addAuditLog, addNotification } from '../store';
+import { settingsService, BackupResponse } from '../services/settingsService';
 
 const SettingsPage: React.FC = () => {
   const theme = useTheme();
   const dispatch = useDispatch();
-
   const currentUser = useSelector((state: RootState) => state.auth.user);
 
-  // Business Parameters states
-  const [delFee, setDelFee] = useState('2.99');
-  const [packFee, setPackFee] = useState('1.50');
-  const [bizHours, setBizHours] = useState('08:00 AM - 11:00 PM');
+  const [loading, setLoading] = useState(true);
+
+  // Business Parameters
+  const [delFee, setDelFee] = useState('');
+  const [packFee, setPackFee] = useState('');
+  const [bizHours, setBizHours] = useState('');
   const [saveAlert, setSaveAlert] = useState(false);
 
-  // API switches states
-  const [apiMaps, setApiMaps] = useState(true);
-  const [apiRazorpay, setApiRazorpay] = useState(true);
+  // API switches
+  const [apiMaps, setApiMaps] = useState(false);
+  const [apiRazorpay, setApiRazorpay] = useState(false);
   const [apiTwilio, setApiTwilio] = useState(false);
-  const [apiSmtp, setApiSmtp] = useState(true);
+  const [apiSmtp, setApiSmtp] = useState(false);
 
   // Backup states
   const [backupProgress, setBackupProgress] = useState(0);
   const [isBackingUp, setIsBackingUp] = useState(false);
   const [backupAlert, setBackupAlert] = useState('');
+  const [backups, setBackups] = useState<BackupResponse[]>([]);
 
-  // Local simulated backups list
-  const [backups, setBackups] = useState([
-    { id: 'BAK-102', size: '4.8 MB', status: 'Completed', date: '2026-07-08 04:00 AM' },
-    { id: 'BAK-101', size: '4.5 MB', status: 'Completed', date: '2026-07-01 04:00 AM' }
-  ]);
+  const fetchSettings = useCallback(async () => {
+    try {
+      setLoading(true);
+      const [biz, apis, baks] = await Promise.all([
+        settingsService.getBusinessSettings(),
+        settingsService.getApiConfigs(),
+        settingsService.getBackups()
+      ]);
+      setDelFee(biz.deliveryFee);
+      setPackFee(biz.packagingFee);
+      setBizHours(biz.businessHours);
 
-  const handleSaveParams = (e: React.FormEvent) => {
+      setApiMaps(apis.googleMaps);
+      setApiRazorpay(apis.razorpay);
+      setApiTwilio(apis.twilio);
+      setApiSmtp(apis.smtp);
+
+      setBackups(baks);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchSettings();
+  }, [fetchSettings]);
+
+  const handleSaveParams = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSaveAlert(true);
-    setTimeout(() => setSaveAlert(false), 3000);
+    try {
+      await settingsService.updateBusinessSettings({
+        deliveryFee: delFee,
+        packagingFee: packFee,
+        businessHours: bizHours
+      });
+      setSaveAlert(true);
+      setTimeout(() => setSaveAlert(false), 3000);
 
-    dispatch(addNotification({
-      title: 'Restaurant Parameters Saved',
-      description: 'Fee structures and operation hours saved successfully.',
-      type: 'system'
-    }));
+      dispatch(addNotification({
+        title: 'Restaurant Parameters Saved',
+        description: 'Fee structures and operation hours saved successfully.',
+        type: 'system'
+      }));
 
-    dispatch(addAuditLog({
-      username: currentUser?.email || 'Simulator Client',
-      role: currentUser?.role || 'Guest',
-      action: 'Saved main business configurations',
-      module: 'Settings',
-      ipAddress: '127.0.0.1',
-      browser: 'Admin Console'
-    }));
+      dispatch(addAuditLog({
+        username: currentUser?.email || 'Simulator Client',
+        role: currentUser?.role || 'Guest',
+        action: 'Saved main business configurations',
+        module: 'Settings',
+        ipAddress: '127.0.0.1',
+        browser: 'Admin Console'
+      }));
+    } catch (err) {
+      console.error(err);
+    }
   };
 
-  const handleToggleApi = (name: string, val: boolean) => {
-    dispatch(addNotification({
-      title: 'API Integration Updated',
-      description: `${name} connectivity flag changed to ${val}`,
-      type: 'system'
-    }));
+  const handleToggleApi = async (name: string, key: string, val: boolean) => {
+    try {
+      const res = await settingsService.toggleApiConfig(key, val);
+      setApiMaps(res.googleMaps);
+      setApiRazorpay(res.razorpay);
+      setApiTwilio(res.twilio);
+      setApiSmtp(res.smtp);
 
-    dispatch(addAuditLog({
-      username: currentUser?.email || 'Simulator Client',
-      role: currentUser?.role || 'Guest',
-      action: `Modified API status for ${name} to ${val}`,
-      module: 'API Integrations',
-      ipAddress: '127.0.0.1',
-      browser: 'Admin Console'
-    }));
+      dispatch(addNotification({
+        title: 'API Integration Updated',
+        description: `${name} connectivity flag changed to ${val}`,
+        type: 'system'
+      }));
+
+      dispatch(addAuditLog({
+        username: currentUser?.email || 'Simulator Client',
+        role: currentUser?.role || 'Guest',
+        action: `Modified API status for ${name} to ${val}`,
+        module: 'API Integrations',
+        ipAddress: '127.0.0.1',
+        browser: 'Admin Console'
+      }));
+    } catch (err) {
+      console.error(err);
+    }
   };
 
-  const handleTriggerBackup = () => {
+  const handleTriggerBackup = async () => {
     if (isBackingUp) return;
     setIsBackingUp(true);
     setBackupProgress(0);
     setBackupAlert('');
 
-    const interval = setInterval(() => {
-      setBackupProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setTimeout(() => {
-            setIsBackingUp(false);
-            const newBak = {
-              id: `BAK-${Date.now().toString().slice(-3)}`,
-              size: '5.1 MB',
-              status: 'Completed',
-              date: new Date().toLocaleString()
-            };
-            setBackups([newBak, ...backups]);
-            setBackupAlert('Cloud snapshot archive created and uploaded to AWS S3 bucket.');
-            
-            dispatch(addNotification({
-              title: 'Database Backup Completed',
-              description: `Database backup size ${newBak.size} compiled.`,
-              type: 'system'
-            }));
+    try {
+      // Intentionally simulating progress bar for UI feel before finalizing
+      const interval = setInterval(() => {
+        setBackupProgress(prev => {
+          if (prev >= 100) {
+            clearInterval(interval);
+            return 100;
+          }
+          return prev + 25;
+        });
+      }, 400);
 
-            dispatch(addAuditLog({
-              username: currentUser?.email || 'Simulator Client',
-              role: currentUser?.role || 'Guest',
-              action: 'Manually triggered system database backup',
-              module: 'Backup & Restore',
-              ipAddress: '127.0.0.1',
-              browser: 'Admin Console'
-            }));
-          }, 500);
-          return 100;
-        }
-        return prev + 25;
-      });
-    }, 400);
+      await new Promise(r => setTimeout(r, 1600)); // wait for progress to fill
+      const newBak = await settingsService.triggerBackup();
+      setBackups([newBak, ...backups]);
+      setBackupAlert('Cloud snapshot archive created and uploaded to AWS S3 bucket.');
+      
+      dispatch(addNotification({
+        title: 'Database Backup Completed',
+        description: `Database backup size ${newBak.size} compiled.`,
+        type: 'system'
+      }));
+
+      dispatch(addAuditLog({
+        username: currentUser?.email || 'Simulator Client',
+        role: currentUser?.role || 'Guest',
+        action: 'Manually triggered system database backup',
+        module: 'Backup & Restore',
+        ipAddress: '127.0.0.1',
+        browser: 'Admin Console'
+      }));
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsBackingUp(false);
+    }
   };
 
   const handleRestoreBackup = (id: string) => {
@@ -143,9 +190,16 @@ const SettingsPage: React.FC = () => {
     }
   };
 
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
   return (
     <Box>
-      {/* Title */}
       <Box sx={{ mb: 4 }}>
         <Typography variant="h4" sx={{ fontFamily: 'Outfit', fontWeight: 800 }}>
           System Settings & Integrations
@@ -168,7 +222,6 @@ const SettingsPage: React.FC = () => {
       )}
 
       <Grid container spacing={3.5} sx={{ mb: 4 }}>
-        {/* Restaurant Configuration Form */}
         <Grid item xs={12} lg={4}>
           <Card>
             <CardContent sx={{ p: 3 }}>
@@ -184,7 +237,6 @@ const SettingsPage: React.FC = () => {
                   <TextField
                     size="small"
                     label="Standard Delivery Charge ($)"
-                    type="number"
                     value={delFee}
                     onChange={(e) => setDelFee(e.target.value)}
                     required
@@ -192,7 +244,6 @@ const SettingsPage: React.FC = () => {
                   <TextField
                     size="small"
                     label="Packaging Surcharge ($)"
-                    type="number"
                     value={packFee}
                     onChange={(e) => setPackFee(e.target.value)}
                     required
@@ -219,7 +270,6 @@ const SettingsPage: React.FC = () => {
           </Card>
         </Grid>
 
-        {/* API Configurations */}
         <Grid item xs={12} lg={4}>
           <Card sx={{ height: '100%' }}>
             <CardContent sx={{ p: 3, display: 'flex', flexDirection: 'column', gap: 2.5 }}>
@@ -239,7 +289,7 @@ const SettingsPage: React.FC = () => {
                   control={
                     <Switch 
                       checked={apiMaps} 
-                      onChange={(e) => { setApiMaps(e.target.checked); handleToggleApi('Google Maps', e.target.checked); }}
+                      onChange={(e) => handleToggleApi('Google Maps', 'Google Maps', e.target.checked)}
                       color="success" 
                     />
                   }
@@ -253,7 +303,7 @@ const SettingsPage: React.FC = () => {
                   control={
                     <Switch 
                       checked={apiRazorpay} 
-                      onChange={(e) => { setApiRazorpay(e.target.checked); handleToggleApi('Razorpay Gateway', e.target.checked); }}
+                      onChange={(e) => handleToggleApi('Razorpay Gateway', 'Razorpay Gateway', e.target.checked)}
                       color="success" 
                     />
                   }
@@ -267,7 +317,7 @@ const SettingsPage: React.FC = () => {
                   control={
                     <Switch 
                       checked={apiTwilio} 
-                      onChange={(e) => { setApiTwilio(e.target.checked); handleToggleApi('Twilio SMS', e.target.checked); }}
+                      onChange={(e) => handleToggleApi('Twilio SMS', 'Twilio SMS', e.target.checked)}
                       color="success" 
                     />
                   }
@@ -281,7 +331,7 @@ const SettingsPage: React.FC = () => {
                   control={
                     <Switch 
                       checked={apiSmtp} 
-                      onChange={(e) => { setApiSmtp(e.target.checked); handleToggleApi('SMTP Email Server', e.target.checked); }}
+                      onChange={(e) => handleToggleApi('SMTP Email Server', 'SMTP Email Server', e.target.checked)}
                       color="success" 
                     />
                   }
@@ -296,7 +346,6 @@ const SettingsPage: React.FC = () => {
           </Card>
         </Grid>
 
-        {/* Database backup widget */}
         <Grid item xs={12} lg={4}>
           <Card sx={{ height: '100%' }}>
             <CardContent sx={{ p: 3, display: 'flex', flexDirection: 'column', gap: 2.5 }}>
@@ -334,7 +383,6 @@ const SettingsPage: React.FC = () => {
         </Grid>
       </Grid>
 
-      {/* Backups lists */}
       <Card>
         <CardContent sx={{ p: 2.5 }}>
           <Typography variant="subtitle1" sx={{ fontWeight: 700, fontFamily: 'Outfit', mb: 2 }}>
@@ -373,6 +421,11 @@ const SettingsPage: React.FC = () => {
                     </TableCell>
                   </TableRow>
                 ))}
+                {backups.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={5} align="center" sx={{ py: 3, color: 'text.secondary' }}>No backups available.</TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           </TableContainer>
