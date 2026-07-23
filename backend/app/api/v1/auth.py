@@ -28,8 +28,17 @@ async def refresh_token(request: Request, data: RefreshTokenRequest):
     return await auth_service.refresh_token(data, get_request_info(request))
 
 @router.post("/logout", summary="User Logout")
-async def logout(request: Request, current_user: User = Depends(get_current_user)):
-    await auth_service.logout(current_user.user_id, get_request_info(request))
+async def logout(request: Request):
+    from app.security.jwt import verify_token
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header.split(" ")[1]
+        payload = verify_token(token)
+        if payload and payload.get("sub"):
+            try:
+                await auth_service.logout(str(payload.get("sub")), get_request_info(request))
+            except Exception:
+                pass
     return {"message": "Successfully logged out"}
 
 @router.post("/change-password", summary="Change Password")
