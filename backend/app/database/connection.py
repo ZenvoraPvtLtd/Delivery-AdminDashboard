@@ -25,6 +25,7 @@ from app.models.settings import BusinessSetting, ApiConfiguration, DatabaseBacku
 from app.models.communication import EmailTemplate, SmsTemplate, ProviderConfig
 from app.models.communication_logs import CommunicationLog, ConversationThread
 from app.models.order import Order
+from app.models.outlet import Outlet
 
 async def init_db():
     try:
@@ -99,7 +100,8 @@ async def init_db():
             ProviderConfig,
             CommunicationLog,
             ConversationThread,
-            Order
+            Order,
+            Outlet
         ]
         
         await init_beanie(

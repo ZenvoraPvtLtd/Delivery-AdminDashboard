@@ -1,4 +1,5 @@
 from fastapi import APIRouter
+# Router initialization
 from app.api.v1 import health
 from app.api.v1 import auth
 from app.api.v1 import users
@@ -16,6 +17,9 @@ from app.api.v1 import settings
 from app.api.v1 import users_roles
 from app.api.v1 import twilio_webhooks
 from app.api.v1 import order_confirmation
+from app.api.v1 import orders
+from app.api.v1 import outlets
+from app.api.v1 import audit
 
 api_router = APIRouter()
 
@@ -36,3 +40,6 @@ api_router.include_router(settings.router, prefix="/v1/settings", tags=["Setting
 api_router.include_router(users_roles.router, prefix="/v1/admin", tags=["UsersRoles"])
 api_router.include_router(twilio_webhooks.router, prefix="/v1/webhook", tags=["Webhooks"])
 api_router.include_router(order_confirmation.router, prefix="/v1", tags=["OrderConfirmation"])
+api_router.include_router(orders.router, prefix="/v1/orders", tags=["Orders"])
+api_router.include_router(outlets.router, prefix="/v1/outlets", tags=["Outlets"])
+api_router.include_router(audit.router, prefix="/v1/audit-logs", tags=["AuditLogs"])

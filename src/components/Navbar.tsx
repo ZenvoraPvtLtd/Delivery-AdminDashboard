@@ -15,7 +15,7 @@ import {
 import { 
   RootState, setActiveOutlet, markAllNotificationsRead, 
   clearNotifications, addAuditLog, logout, updateUserProfile,
-  addNotification, markNotificationRead
+  addNotification, markNotificationRead, setUserRole
 } from '../store';
 import { Role } from '../store';
 
@@ -102,16 +102,16 @@ const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
   };
 
   const handleRoleChange = (newRole: Role) => {
+    dispatch(setUserRole(newRole));
     dispatch(addNotification({
-      title: 'Role Switching Disabled',
-      description: 'You cannot switch roles dynamically on a production backend without logging out.',
+      title: 'Active Role Switched',
+      description: `Dashboard profile updated to ${newRole}. Sidebar permissions adjusted.`,
       type: 'system'
     }));
     
-    // Add audit log for simulation
     dispatch(addAuditLog({
-      username: 'Simulator Client',
-      role: 'Super Admin',
+      username: user?.email || 'Simulator Client',
+      role: newRole,
       action: `Simulated role changed to ${newRole}`,
       module: 'RBAC',
       ipAddress: '127.0.0.1',

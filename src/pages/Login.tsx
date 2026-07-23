@@ -7,7 +7,7 @@ import {
 } from '@mui/material';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ShieldCheck, Mail, Lock, PhoneCall, ShieldAlert, KeyRound, Loader2 } from 'lucide-react';
-import { RootState, loginThunk, verify2FA, addAuditLog } from '../store';
+import { RootState, loginThunk, fetchCurrentUserThunk, verify2FA, addAuditLog } from '../store';
 import { Role } from '../store';
 
 const Login: React.FC = () => {
@@ -16,7 +16,7 @@ const Login: React.FC = () => {
   const theme = useTheme();
   
   const { mode } = useSelector((state: RootState) => state.ui);
-  const { isLoading, error } = useSelector((state: RootState) => state.auth);
+  const { isAuthenticated, isLoading, error } = useSelector((state: RootState) => state.auth);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -26,15 +26,26 @@ const Login: React.FC = () => {
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotSent, setForgotSent] = useState(false);
 
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  React.useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/dashboard');
+    }
+  }, [isAuthenticated, navigate]);
+
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) return;
     
-    dispatch(loginThunk({
+    const resultAction = await dispatch(loginThunk({
       email,
       password,
       rememberMe
     }));
+
+    if (loginThunk.fulfilled.match(resultAction)) {
+      dispatch(fetchCurrentUserThunk());
+      navigate('/dashboard');
+    }
 
     dispatch(addAuditLog({
       username: email,

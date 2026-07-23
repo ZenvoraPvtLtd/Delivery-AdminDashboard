@@ -58,11 +58,29 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onToggleSidebar }) => {
     { text: 'Communication Config', icon: Sliders, path: '/settings/communication', module: 'Settings' }
   ];
 
+  // Helper to normalize backend role strings to frontend RBAC keys
+  const getNormalizedRole = (rawRole?: string): keyof typeof rbac => {
+    if (!rawRole) return 'Super Admin';
+    const r = rawRole.toLowerCase().replace(/_/g, ' ');
+    if (r.includes('super')) return 'Super Admin';
+    if (r.includes('admin')) return 'Admin';
+    if (r.includes('outlet')) return 'Outlet Manager';
+    if (r.includes('kitchen')) return 'Kitchen Manager';
+    if (r.includes('delivery')) return 'Delivery Manager';
+    if (r.includes('finance')) return 'Finance Manager';
+    if (r.includes('inventory')) return 'Inventory Manager';
+    if (r.includes('customer') || r.includes('support')) return 'Customer Support';
+    if (r.includes('marketing')) return 'Marketing Manager';
+    return 'Super Admin';
+  };
+
   // Helper to filter menu based on role permissions
   const filteredMenuItems = menuItems.filter(item => {
-    if (!user) return false;
-    const permissions = rbac[user.role];
-    return permissions?.[item.module]?.read !== false;
+    const roleKey = getNormalizedRole(user?.role);
+    if (roleKey === 'Super Admin' || roleKey === 'Admin') return true;
+    const permissions = rbac[roleKey] || rbac['Super Admin'] || rbac['Admin'];
+    if (!permissions || !permissions[item.module]) return true;
+    return permissions[item.module].read !== false;
   });
 
   const drawerContent = (

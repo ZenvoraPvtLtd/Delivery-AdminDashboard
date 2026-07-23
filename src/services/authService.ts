@@ -7,8 +7,13 @@ export interface LoginRequest {
 }
 
 export interface AuthResponse {
-  success: boolean;
-  message: string;
+  message?: string;
+  tokens?: {
+    access_token: string;
+    refresh_token: string;
+    token_type: string;
+  };
+  success?: boolean;
   data?: {
     access_token: string;
     refresh_token: string;
@@ -17,8 +22,14 @@ export interface AuthResponse {
 }
 
 export interface CurrentUserResponse {
-  success: boolean;
-  data: {
+  id?: string;
+  email?: string;
+  full_name?: string;
+  role?: string;
+  permissions?: string[];
+  is_active?: boolean;
+  success?: boolean;
+  data?: {
     id: string;
     email: string;
     full_name: string;

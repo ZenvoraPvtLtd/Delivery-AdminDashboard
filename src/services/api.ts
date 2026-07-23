@@ -59,12 +59,12 @@ api.interceptors.response.use(
 
       if (refreshToken) {
         try {
-          const res = await axios.post(`${API_BASE_URL}/api/v1/auth/refresh`, {
+          const res = await axios.post(`${API_BASE_URL}/api/v1/auth/refresh-token`, {
             refresh_token: refreshToken
           });
           
-          if (res.data?.data?.access_token) {
-            const newAccessToken = res.data.data.access_token;
+          const newAccessToken = res.data?.access_token || res.data?.tokens?.access_token || res.data?.data?.access_token;
+          if (newAccessToken) {
             setAuthToken(newAccessToken);
             originalRequest.headers['Authorization'] = `Bearer ${newAccessToken}`;
             return api(originalRequest);

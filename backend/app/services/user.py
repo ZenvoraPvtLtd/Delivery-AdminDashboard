@@ -81,18 +81,30 @@ class UserService:
         await self._log_audit(current_user.user_id, "user", "delete", old_data, None, request_info)
 
     def _map_to_response(self, user: User) -> UserResponse:
-        # For mapping role_id back to Role enum representation, we could look it up, but for schema simplicity we'll just return role_id as role if needed.
-        # Actually our schema expects Role enum. To be precise, we need to map role_id to RoleEnum string. 
-        # For simplicity, returning the user.role_id might violate schema if it expects Enum. 
-        # But this is handled in Pydantic.
         from app.constants.roles import Role as RoleEnum
-        # Try to infer role name or just fallback
+        role_val = RoleEnum.SUPER_ADMIN
+        if user.role_id:
+            raw = str(user.role_id).lower()
+            if "support" in raw:
+                role_val = RoleEnum.SUPPORT
+            elif "manager" in raw:
+                role_val = RoleEnum.MANAGER
+            elif "admin" in raw:
+                role_val = RoleEnum.ADMIN
+            elif "super" in raw:
+                role_val = RoleEnum.SUPER_ADMIN
+            else:
+                for r in RoleEnum:
+                    if r.value == user.role_id:
+                        role_val = r
+                        break
+
         return UserResponse(
             id=user.user_id,
             full_name=user.full_name,
             email=user.email,
             mobile_number=user.mobile_number,
-            role=RoleEnum.SUPPORT, # Mocked for schema compatibility without DB lookup
+            role=role_val,
             status=user.status,
             is_verified=user.is_verified,
             last_login=user.last_login,

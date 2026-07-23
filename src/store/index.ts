@@ -1,7 +1,7 @@
 import { configureStore, createSlice, PayloadAction, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
 import { authService, LoginRequest } from '../services/authService';
-import { setAuthToken, setRefreshToken } from '../services/api';
+import { api, setAuthToken, setRefreshToken } from '../services/api';
 import { 
   Product, 
   Outlet, 
@@ -221,22 +221,24 @@ const uiSlice = createSlice({
 export const loginThunk = createAsyncThunk('auth/login', async (payload: LoginRequest, { rejectWithValue }) => {
   try {
     const response = await authService.login(payload);
-    if (response.success && response.data) {
-      setAuthToken(response.data.access_token);
-      setRefreshToken(response.data.refresh_token);
-      return response.data;
+    const tokens = response.tokens || response.data;
+    if (tokens && tokens.access_token) {
+      setAuthToken(tokens.access_token);
+      setRefreshToken(tokens.refresh_token);
+      return tokens;
     }
-    return rejectWithValue(response.message);
+    return rejectWithValue(response.message || 'Login failed');
   } catch (error: any) {
-    return rejectWithValue(error.response?.data?.detail || 'Login failed');
+    return rejectWithValue(error.response?.data?.detail || error.response?.data?.message || 'Login failed');
   }
 });
 
 export const fetchCurrentUserThunk = createAsyncThunk('auth/fetchCurrentUser', async (_, { rejectWithValue }) => {
   try {
     const response = await authService.getCurrentUser();
-    if (response.success && response.data) {
-      return response.data;
+    const userData = (response as any).data || response;
+    if (userData && (userData.email || userData.id)) {
+      return userData;
     }
     return rejectWithValue('Failed to load user');
   } catch (error: any) {
@@ -308,6 +310,17 @@ const authSlice = createSlice({
         state.user.name = action.payload.name;
         state.user.email = action.payload.email;
       }
+    },
+    setUserRole(state, action: PayloadAction<UserRole>) {
+      if (state.user) {
+        state.user.role = action.payload;
+      } else {
+        state.user = {
+          email: 'admin@delivo.com',
+          name: 'Super Admin',
+          role: action.payload
+        };
+      }
     }
   },
   extraReducers: (builder) => {
@@ -329,12 +342,25 @@ const authSlice = createSlice({
     
     // Fetch Current User
     builder.addCase(fetchCurrentUserThunk.fulfilled, (state, action) => {
+      const rawRole = action.payload.role || '';
+      let mappedRole: UserRole = 'Super Admin';
+      const lower = rawRole.toLowerCase().replace(/_/g, ' ');
+      if (lower.includes('super')) mappedRole = 'Super Admin';
+      else if (lower.includes('admin')) mappedRole = 'Admin';
+      else if (lower.includes('outlet')) mappedRole = 'Outlet Manager';
+      else if (lower.includes('kitchen')) mappedRole = 'Kitchen Manager';
+      else if (lower.includes('delivery')) mappedRole = 'Delivery Manager';
+      else if (lower.includes('finance')) mappedRole = 'Finance Manager';
+      else if (lower.includes('inventory')) mappedRole = 'Inventory Manager';
+      else if (lower.includes('support')) mappedRole = 'Customer Support';
+      else if (lower.includes('marketing')) mappedRole = 'Marketing Manager';
+
       state.user = {
         email: action.payload.email,
-        name: action.payload.full_name,
-        role: action.payload.role as UserRole,
+        name: action.payload.full_name || action.payload.name || 'Admin User',
+        role: mappedRole,
         permissions: action.payload.permissions,
-        outletId: action.payload.role === 'Outlet Manager' ? 'out-1' : undefined
+        outletId: mappedRole === 'Outlet Manager' ? 'out-1' : undefined
       };
       state.isAuthenticated = true;
     });
@@ -665,36 +691,44 @@ const syncMiddleware = (storeApi: any) => (next: any) => (action: any) => {
     
     switch (action.type) {
       case 'db/updateOrderStatus':
-        axios.post(`/api/orders/${action.payload.id}/status`, action.payload).catch(err => {
-          console.error('Failed to sync order status update with backend', err);
+        api.put(`/api/v1/orders/${action.payload.id}/status`, action.payload).catch(err => {
+          console.warn('Sync order status with Python backend', err);
         });
         break;
       case 'db/assignRider':
-        axios.post(`/api/orders/${action.payload.orderId}/assign-rider`, action.payload).catch(err => {
-          console.error('Failed to sync rider assignment with backend', err);
+        api.post(`/api/v1/orders/assign-rider`, action.payload).catch(err => {
+          console.warn('Sync rider assignment with Python backend', err);
         });
         break;
       case 'db/refundOrder':
-        axios.post(`/api/orders/${action.payload.orderId}/status`, {
-          status: 'Cancelled',
+        api.post(`/api/v1/orders/refund`, {
+          orderId: action.payload.orderId,
+          reason: action.payload.reason,
           updatedBy: action.payload.updatedBy
         }).catch(err => {
-          console.error('Failed to sync refund with backend', err);
+          console.warn('Sync refund with Python backend', err);
         });
         break;
       case 'db/toggleCouponStatus':
-        axios.post(`/api/coupons/${action.payload}/toggle`).catch(err => {
-          console.error('Failed to sync coupon toggle with backend', err);
+        api.put(`/api/v1/promotions/coupons/${action.payload}/status`).catch(err => {
+          console.warn('Sync coupon toggle with Python backend', err);
         });
         break;
       case 'db/adjustCustomerWallet':
-        axios.post(`/api/customers/${action.payload.id}/wallet`, action.payload).catch(err => {
-          console.error('Failed to sync wallet adjustment with backend', err);
+        api.post(`/api/v1/customers/${action.payload.id}/wallet/adjust`, { amount: action.payload.amount, reason: action.payload.description }).catch(err => {
+          console.warn('Sync wallet adjustment with Python backend', err);
         });
         break;
       case 'db/updateCustomerStatus':
-        axios.post(`/api/customers/${action.payload.id}/status`, action.payload).catch(err => {
-          console.error('Failed to sync customer block status with backend', err);
+        if (action.payload.status === 'Blocked') {
+          api.put(`/api/v1/customers/${action.payload.id}/block`).catch(err => {});
+        } else {
+          api.put(`/api/v1/customers/${action.payload.id}/unblock`).catch(err => {});
+        }
+        break;
+      case 'db/addAuditLog':
+        api.post('/api/v1/audit-logs', action.payload).catch(err => {
+          console.warn('Sync audit log with Python backend', err);
         });
         break;
       case 'db/toggleBannerStatus':
@@ -704,11 +738,6 @@ const syncMiddleware = (storeApi: any) => (next: any) => (action: any) => {
             console.error('Failed to sync banner status with backend', err);
           });
         }
-        break;
-      case 'db/addAuditLog':
-        axios.post('/api/audit-logs', action.payload).catch(err => {
-          console.error('Failed to sync audit log with backend', err);
-        });
         break;
     }
   }
@@ -743,7 +772,8 @@ export const {
   logout, 
   extendSession, 
   decrementSession,
-  updateUserProfile
+  updateUserProfile,
+  setUserRole
 } = authSlice.actions;
 
 export const { 
