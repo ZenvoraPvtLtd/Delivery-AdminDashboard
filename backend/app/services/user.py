@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 from app.schemas.user import CreateUserRequest, UpdateUserRequest, UserResponse
 from app.models.user import User
 from app.repositories.user import user_repository
@@ -84,7 +84,7 @@ class UserService:
         from app.constants.roles import Role as RoleEnum
         role_val = RoleEnum.SUPER_ADMIN
         if user.role_id:
-            raw = str(user.role_id).lower()
+            raw = user.role_id.lower()
             if "support" in raw:
                 role_val = RoleEnum.SUPPORT
             elif "manager" in raw:
@@ -112,7 +112,7 @@ class UserService:
             updated_at=user.updated_at
         )
 
-    async def _log_audit(self, user_id: str, module: str, action: str, old_data: dict, new_data: dict, request_info: dict):
+    async def _log_audit(self, user_id: str, module: str, action: str, old_data: Optional[dict], new_data: Optional[dict], request_info: dict):
         log = AuditLog(
             user_id=user_id,
             module=module,

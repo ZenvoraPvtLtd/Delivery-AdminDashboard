@@ -53,9 +53,22 @@ def create_app() -> FastAPI:
 
     setup_exception_handlers(app)
     app.state.limiter = limiter
-    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore
 
     app.include_router(api_router, prefix="/api")
+
+    @app.get("/", tags=["Health"])
+    async def root():
+        return {
+            "status": "online",
+            "message": f"Welcome to {settings.APP_NAME}",
+            "docs": "/docs",
+            "health": "/health"
+        }
+
+    @app.get("/health", tags=["Health"])
+    async def health_check():
+        return {"status": "healthy", "service": settings.APP_NAME}
 
     return app
 
