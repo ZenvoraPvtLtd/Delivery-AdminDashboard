@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, Query, Request
-from typing import Any
+from typing import Any, Optional
 from app.services.product import ProductService, get_product_service
 from app.schemas.product import (
     ProductCreate, ProductResponse, PaginatedProductResponse,
@@ -32,10 +32,10 @@ async def create_product(
 async def list_products(
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
-    search: str = None,
-    category: str = None,
-    veg_filter: str = None,
-    menu_schedule: str = None,
+    search: Optional[str] = None,
+    category: Optional[str] = None,
+    veg_filter: Optional[str] = None,
+    menu_schedule: Optional[str] = None,
     sort: str = "-created_at",
     service: ProductService = Depends(get_product_service),
     current_user: User = Depends(get_current_user)
@@ -47,6 +47,8 @@ async def list_products(
     for p in products:
         pdict = p.model_dump()
         pdict["id"] = str(p.id)
+        pdict["price"] = getattr(p, "selling_price", 0.0)
+        pdict["availability"] = getattr(p, "visibility", True)
         pdict["preparationTime"] = p.preparation_time
         pdict["isVeg"] = p.is_veg
         pdict["isBestSeller"] = p.best_seller
