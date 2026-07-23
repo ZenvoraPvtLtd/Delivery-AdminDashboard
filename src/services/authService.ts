@@ -1,3 +1,4 @@
+import axios from 'axios';
 import { api } from './api';
 
 export interface LoginRequest {
@@ -52,7 +53,14 @@ class AuthService {
 
   async logout(): Promise<void> {
     try {
-      await api.post('/api/v1/auth/logout');
+      const token = localStorage.getItem('access_token');
+      if (token) {
+        // @ts-ignore
+        const baseUrl = import.meta.env.VITE_API_BASE_URL || 'https://delivery-admindashboard-1.onrender.com';
+        await axios.post(`${baseUrl}/api/v1/auth/logout`, {}, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      }
     } catch (error) {
       console.warn("Logout endpoint failed, proceeding with local cleanup");
     }

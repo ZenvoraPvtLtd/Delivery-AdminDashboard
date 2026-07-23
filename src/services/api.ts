@@ -48,8 +48,8 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    // Skip interception if it's the refresh route itself
-    if (originalRequest.url?.includes('/v1/auth/refresh')) {
+    // Skip interception if it's the refresh or logout route itself
+    if (originalRequest.url?.includes('/v1/auth/refresh') || originalRequest.url?.includes('/v1/auth/logout')) {
       return Promise.reject(error);
     }
 
