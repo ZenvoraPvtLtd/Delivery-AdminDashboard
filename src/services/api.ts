@@ -3,7 +3,7 @@ import { store, logout } from '../store';
 import { addNotification } from '../store';
 
 // @ts-ignore
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://delivery-admindashboard-1.onrender.com';
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
